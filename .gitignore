@@ -1,7 +1,39 @@
-# ================= 交付要求: md 文档只保留 README.md =================
-# 其余 .md(competition.md / 设计文档 / 真机部署 等)一律不进仓库。
+# ================= markdown 提交范围 =================
+# 默认不提交任何 md, 只白名单"已发布的文档真正引用到"的那些 ——
+# 这样 README 里不会出现死链, 又不会把没打算公开的稿子带出去。
+# 注意: .gitignore 不支持行尾注释, 注释必须单独成行。
 *.md
+
+# 入口 README(各包 / 各目录)
 !README.md
+
+# 被 README 引用的文档:
+#   competition.md                 赛题细则(定稿版)
+#   web.md                         赛事总则与赛题细则链接
+#   design/规则校核报告.md          规则校核与实测依据
+#   design/赛事设计指南.md          怎么从零把比赛办起来
+#   docs/JAKA-Mini2-参数速查.md     官方参数 vs URDF 实测
+#   docs/真机部署.md                决赛真机部署指南
+#   dual_arm_demo/ROLES.md         双臂演示的角色说明
+#   extras_linkerhand/doc/Topic-Reference.md
+#   jaka_ros2/jaka_ros2_documentation.md
+#   jaka_ros2/jaka_ros2_documentation-中文版.md
+#   jaka_ros2/release_notes.md
+!competition.md
+!web.md
+!design/规则校核报告.md
+!design/赛事设计指南.md
+!docs/JAKA-Mini2-参数速查.md
+!docs/真机部署.md
+!dual_arm_demo/ROLES.md
+!extras_linkerhand/doc/Topic-Reference.md
+!jaka_ros2/jaka_ros2_documentation.md
+!jaka_ros2/jaka_ros2_documentation-中文版.md
+!jaka_ros2/release_notes.md
+
+# 仍然不提交:
+#   competition-初稿-已归档.md     已被定稿取代, 发布只会让人照错的规则做
+#   extras_linkerhand/README_CN.md 无人引用, 与 README.md 内容重复
 
 # ================= 构建产物 =================
 # 这两个目录里大量符号链接指向本机绝对路径(/home/<user>/...),
