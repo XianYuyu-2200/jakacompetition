@@ -1,0 +1,35 @@
+[MASTER] PID=337385, IP=192.168.0.101
+try to connect: 192.168.0.101
+connect success
+[MASTER] login_ret=0
+[MASTER] sample=0, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=1, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=2, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=3, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=4, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=5, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=6, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=7, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=8, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] sample=9, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[MASTER] joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] actual_joints_rad=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+[MASTER] logout_ret=0

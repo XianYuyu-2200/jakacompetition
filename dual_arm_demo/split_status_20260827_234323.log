@@ -1,0 +1,10 @@
+operator arm: 192.168.0.101
+tracking arm: 192.168.0.102
+data flow: 192.168.0.101 -> 192.168.0.102
+dry-run only: no robot motion commands
+/home/ktz/codex/codex-jaka_mini_2/jaka_dual_readonly/operator_joint_publisher: error while loading shared libraries: libjakaAPI.so: cannot open shared object file: No such file or directory
+operator publisher exited before creating status socket
+try to connect: 192.168.0.102
+connect success
+tracking dry-run login_ret=0 ip=192.168.0.102
+dry-run summary received=0 valid=0 invalid=0 sdk_errors=0 tracking_read_errors=0 sequence_gaps=0 processed_samples=0 processing_skips=0 metrics_samples=0 avg_latency_ms=0.000000 max_latency_ms=0.000000 max_abs_error_rad=0.000000 max_receive_interval_ms=0.000000 max_tracking_joint_call_ms=0.000000 max_tracking_status_call_ms=0.000000 mapper_armed=0 final_state=WAITING tracking_pose_valid=0 logout_ret=0

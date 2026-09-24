@@ -1,0 +1,26 @@
+Six-joint follow test: 192.168.0.101 -> 192.168.0.102
+J1-J6 relative motion is 1:1
+No automatic robot power-on or robot enable
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+six-joint follower login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+operator zero captured sequence=187
+servo_move_enable_ret=0
+seq=212 operator_q=[1.570801, 0.785378, -1.570790, 0.000013, -1.572128, -0.000021] target_q=[-1.570734, 0.785396, -1.570807, -0.000086, -1.572165, -1.570779] actual_q=[-1.570614, 0.785372, -1.570759, -0.000086, -1.571841, -1.570995] error_deg=[0.006866, 0.001373, 0.002747, 0.000000, 0.018539, 0.012360] latency_ms=0.086733
+seq=237 operator_q=[1.570801, 0.785378, -1.570778, 0.000013, -1.571469, -0.000021] target_q=[-1.570734, 0.785396, -1.570795, -0.000086, -1.571506, -1.570779] actual_q=[-1.570614, 0.785372, -1.570759, -0.000074, -1.571350, -1.570971] error_deg=[0.006866, 0.001373, 0.002060, 0.000687, 0.008926, 0.010986] latency_ms=0.357793
+seq=262 operator_q=[1.570801, 0.785378, -1.570778, 0.000013, -1.530039, -0.000021] target_q=[-1.570734, 0.785396, -1.570795, -0.000086, -1.530076, -1.570779] actual_q=[-1.570662, 0.785396, -1.570699, -0.000086, -1.556573, -1.570851] error_deg=[0.004120, 0.000000, 0.005493, 0.000000, 1.518173, 0.004120] latency_ms=0.088976
+seq=287 operator_q=[1.570801, 0.785366, -1.570778, 0.000013, -1.438180, -0.000021] target_q=[-1.570734, 0.785384, -1.570795, -0.000086, -1.438217, -1.570779] actual_q=[-1.570746, 0.785384, -1.570783, -0.000086, -1.466356, -1.570839] error_deg=[0.000687, 0.000000, 0.000687, 0.000000, 1.612244, 0.003433] latency_ms=2.710344
+seq=312 operator_q=[1.570801, 0.785366, -1.570766, 0.000025, -1.336482, -0.000021] target_q=[-1.570734, 0.785384, -1.570783, -0.000074, -1.336519, -1.570779] actual_q=[-1.570746, 0.785384, -1.570723, -0.000086, -1.362141, -1.570827] error_deg=[0.000687, 0.000000, 0.003433, 0.000687, 1.468048, 0.002747] latency_ms=2.084752
+seq=337 operator_q=[1.570801, 0.785354, -1.570766, 0.000025, -1.268484, -0.000033] target_q=[-1.570734, 0.785372, -1.570783, -0.000074, -1.268521, -1.570791] actual_q=[-1.570746, 0.785384, -1.570735, -0.000014, -1.283033, -1.570755] error_deg=[0.000687, 0.000687, 0.002747, 0.003433, 0.831528, 0.002060] latency_ms=0.114827
+seq=362 operator_q=[1.570801, 0.784911, -1.570778, 0.000025, -1.254917, -0.000033] target_q=[-1.570734, 0.784928, -1.570795, -0.000074, -1.254954, -1.570791] actual_q=[-1.570746, 0.785228, -1.570831, -0.000026, -1.256704, -1.570743] error_deg=[0.000687, 0.017166, 0.002060, 0.002747, 0.100250, 0.002747] latency_ms=0.093093
+seq=387 operator_q=[1.570801, 0.752841, -1.570778, -0.000035, -1.217742, -0.000033] target_q=[-1.570734, 0.752859, -1.570795, -0.000134, -1.217779, -1.570791] actual_q=[-1.570758, 0.759690, -1.571046, -0.000421, -1.238800, -1.570755] error_deg=[0.001373, 0.391388, 0.014420, 0.016479, 1.204376, 0.002060] latency_ms=2.060795
+six-joint follow summary commands=207 state_samples=41 stop_reason=SERVO_J_FAILED active_duration_sec=1.733808 avg_latency_ms=1.225756 max_latency_ms=10.310689 avg_error_deg=[0.002747, 0.091324, 0.002814, 0.001825, 0.854840, 0.005460] max_error_deg=[0.006866, 1.788025, 0.014420, 0.016479, 3.576050, 0.013046] abort_ret=0 servo_disable_ret=0 logout_ret=0
+operator sequence=125 rate_hz=122.89 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=123.93 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=375 rate_hz=123.97 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=1
+operator summary samples=433 read_ok=433 read_errors=0 sent=433 send_errors=0 max_publish_interval_ms=23.054891 max_operator_joint_call_ms=11.572609 max_operator_status_call_ms=1.046113 max_operator_drag_call_ms=15.086079 missed_periods=6 logout_ret=0
+operator exit code: 0
+six-joint follower exit code: 0

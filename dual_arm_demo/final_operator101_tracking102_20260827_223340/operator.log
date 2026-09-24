@@ -1,0 +1,7 @@
+try to connect: 192.168.0.101
+connect success
+operator login_ret=0 ip=192.168.0.101
+operator sequence=125 rate_hz=117.99 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=0 enabled=0 dragging=0
+operator sequence=250 rate_hz=118.69 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=0 enabled=0 dragging=0
+operator sequence=375 rate_hz=119.48 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=0 enabled=0 dragging=0
+operator summary samples=482 read_ok=482 read_errors=0 sent=482 send_errors=0 logout_ret=0

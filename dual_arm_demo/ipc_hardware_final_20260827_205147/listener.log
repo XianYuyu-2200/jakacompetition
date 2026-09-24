@@ -1,0 +1,6 @@
+listener state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+listener sequence=124 latency_ms=0.136258 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener sequence=249 latency_ms=0.014162 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener state=HOLD age_ms=25.333 reason=DATA_STALE
+listener state=FAULT age_ms=102.857 reason=DATA_TIMEOUT
+listener summary received=374 valid=374 invalid=0 sdk_errors=0 sequence_gaps=0 final_state=FAULT

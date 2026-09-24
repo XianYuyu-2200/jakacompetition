@@ -1,0 +1,110 @@
+operator arm: 192.168.0.101
+tracking arm: 192.168.0.102
+data flow: 192.168.0.101 -> 192.168.0.102
+dry-run only: no robot motion commands
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+tracking dry-run login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run state=HOLD age_ms=25.830 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=24.980 reason=DATA_STALE
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=26.483 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=26.877 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=25.977 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=30.940 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=27.475 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+operator sequence=125 rate_hz=124.87 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=124.94 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=375 rate_hz=123.68 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=500 rate_hz=124.23 read_ok=500 read_errors=0 sent=500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=625 rate_hz=124.18 read_ok=625 read_errors=0 sent=625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=750 rate_hz=123.99 read_ok=750 read_errors=0 sent=750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=875 rate_hz=124.13 read_ok=875 read_errors=0 sent=875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1000 rate_hz=124.21 read_ok=1000 read_errors=0 sent=1000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1125 rate_hz=124.32 read_ok=1125 read_errors=0 sent=1125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1250 rate_hz=124.39 read_ok=1250 read_errors=0 sent=1250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1375 rate_hz=124.27 read_ok=1375 read_errors=0 sent=1375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1500 rate_hz=124.16 read_ok=1500 read_errors=0 sent=1500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1625 rate_hz=124.00 read_ok=1625 read_errors=0 sent=1625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1750 rate_hz=124.07 read_ok=1750 read_errors=0 sent=1750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1875 rate_hz=124.13 read_ok=1875 read_errors=0 sent=1875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2000 rate_hz=124.04 read_ok=2000 read_errors=0 sent=2000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2125 rate_hz=124.00 read_ok=2125 read_errors=0 sent=2125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2250 rate_hz=124.06 read_ok=2250 read_errors=0 sent=2250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2375 rate_hz=124.10 read_ok=2375 read_errors=0 sent=2375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2500 rate_hz=124.05 read_ok=2500 read_errors=0 sent=2500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2625 rate_hz=124.05 read_ok=2625 read_errors=0 sent=2625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2750 rate_hz=124.05 read_ok=2750 read_errors=0 sent=2750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2875 rate_hz=124.00 read_ok=2875 read_errors=0 sent=2875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3000 rate_hz=123.96 read_ok=3000 read_errors=0 sent=3000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3125 rate_hz=123.88 read_ok=3125 read_errors=0 sent=3125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3250 rate_hz=123.70 read_ok=3250 read_errors=0 sent=3250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3375 rate_hz=123.67 read_ok=3375 read_errors=0 sent=3375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3500 rate_hz=123.72 read_ok=3500 read_errors=0 sent=3500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3625 rate_hz=123.77 read_ok=3625 read_errors=0 sent=3625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3750 rate_hz=123.81 read_ok=3750 read_errors=0 sent=3750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3875 rate_hz=123.84 read_ok=3875 read_errors=0 sent=3875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4000 rate_hz=123.85 read_ok=4000 read_errors=0 sent=4000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4125 rate_hz=123.80 read_ok=4125 read_errors=0 sent=4125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4250 rate_hz=123.80 read_ok=4250 read_errors=0 sent=4250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4375 rate_hz=123.78dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=27.487 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=ARMED leader_sequence=4736
+dry-run sequence=4749 latency_ms=0.017076 leader_q=[1.723384, 0.090940, -1.563504, 0.247224, -1.729924, -0.000309] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[0.000038, 2.101503, -2.094901, 0.000046, -1.588080, -0.000007] error_q=[0.000012, 0.000012, 0.000000, 0.000024, -0.013087, 0.000000]
+dry-run sequence=4874 latency_ms=0.018535 leader_q=[1.835964, 0.089850, -1.563480, 0.366407, -1.786190, -0.000309] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[0.112618, 2.100413, -2.094877, 0.119229, -1.644346, -0.000007] error_q=[0.112592, -0.001079, 0.000024, 0.119207, -0.069353, 0.000000]
+dry-run summary received=4950 valid=4950 invalid=0 sdk_errors=0 tracking_read_errors=0 sequence_gaps=0 metrics_samples=214 avg_latency_ms=0.259337 max_latency_ms=12.742579 max_abs_error_rad=0.120597 mapper_armed=1 final_state=FRESH tracking_pose_valid=1 logout_ret=0
+ read_ok=4375 read_errors=0 sent=4375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4500 rate_hz=123.81 read_ok=4500 read_errors=0 sent=4500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4625 rate_hz=123.85 read_ok=4625 read_errors=0 sent=4625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4750 rate_hz=123.82 read_ok=4750 read_errors=0 sent=4750 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=4875 rate_hz=123.85 read_ok=4875 read_errors=0 sent=4875 send_errors=0 powered=1 enabled=1 dragging=1
+operator summary samples=4952 read_ok=4952 read_errors=0 sent=4952 send_errors=0 logout_ret=0
+operator exit code: 0
+tracking exit code: 0

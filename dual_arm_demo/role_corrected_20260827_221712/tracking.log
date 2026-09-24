@@ -1,0 +1,9 @@
+try to connect: 192.168.0.101
+connect success
+tracking dry-run login_ret=0 ip=192.168.0.101
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=0 operator_powered=0 operator_enabled=0 operator_dragging=0 tracking_powered=0
+dry-run mapper=WAITING operator_ready=0 tracking_ready=0 operator_powered=0 operator_enabled=0 operator_dragging=0 tracking_powered=0
+dry-run state=HOLD age_ms=27.460 reason=DATA_STALE
+dry-run state=FAULT age_ms=104.112 reason=DATA_TIMEOUT
+dry-run summary received=374 valid=374 invalid=0 sdk_errors=0 tracking_read_errors=0 sequence_gaps=0 metrics_samples=0 avg_latency_ms=0.000000 max_latency_ms=0.000000 max_abs_error_rad=0.000000 mapper_armed=0 final_state=FAULT tracking_pose_valid=1 logout_ret=0

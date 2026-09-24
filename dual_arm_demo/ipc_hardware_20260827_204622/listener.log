@@ -1,0 +1,8 @@
+listener state=FRESH age_ms=0.000
+listener sequence=124 latency_ms=0.127019 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener sequence=249 latency_ms=0.006562 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener sequence=374 latency_ms=0.038397 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener sequence=499 latency_ms=0.127728 sdk_code=0 q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+listener state=HOLD age_ms=25.574
+listener state=FAULT age_ms=102.188
+listener summary received=624 valid=624 invalid=0 sequence_gaps=0 final_state=FAULT

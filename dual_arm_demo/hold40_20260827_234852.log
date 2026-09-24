@@ -1,0 +1,73 @@
+operator arm: 192.168.0.101
+tracking arm: 192.168.0.102
+data flow: 192.168.0.101 -> 192.168.0.102
+dry-run only: no robot motion commands
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+tracking dry-run login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run summary received=3743 valid=3743 invalid=0 sdk_errors=0 tracking_read_errors=0 sequence_gaps=0 processed_samples=3734 processing_skips=9 metrics_samples=0 avg_latency_ms=0.000000 max_latency_ms=0.000000 max_abs_error_rad=0.000000 max_receive_interval_ms=19.905142 max_tracking_joint_call_ms=20.638017 max_tracking_status_call_ms=23.176058 mapper_armed=0 final_state=FRESH tracking_pose_valid=1 logout_ret=0
+operator sequence=125 rate_hz=124.86 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=124.92 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=375 rate_hz=124.95 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=500 rate_hz=124.96 read_ok=500 read_errors=0 sent=500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=625 rate_hz=124.97 read_ok=625 read_errors=0 sent=625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=750 rate_hz=124.96 read_ok=750 read_errors=0 sent=750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=875 rate_hz=124.97 read_ok=875 read_errors=0 sent=875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1000 rate_hz=124.98 read_ok=1000 read_errors=0 sent=1000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1125 rate_hz=124.98 read_ok=1125 read_errors=0 sent=1125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1250 rate_hz=124.98 read_ok=1250 read_errors=0 sent=1250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1375 rate_hz=124.98 read_ok=1375 read_errors=0 sent=1375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1500 rate_hz=124.99 read_ok=1500 read_errors=0 sent=1500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1625 rate_hz=124.91 read_ok=1625 read_errors=0 sent=1625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1750 rate_hz=124.92 read_ok=1750 read_errors=0 sent=1750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1875 rate_hz=124.86 read_ok=1875 read_errors=0 sent=1875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2000 rate_hz=124.84 read_ok=2000 read_errors=0 sent=2000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2125 rate_hz=124.82 read_ok=2125 read_errors=0 sent=2125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2250 rate_hz=124.82 read_ok=2250 read_errors=0 sent=2250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2375 rate_hz=124.84 read_ok=2375 read_errors=0 sent=2375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2500 rate_hz=124.79 read_ok=2500 read_errors=0 sent=2500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2625 rate_hz=124.76 read_ok=2625 read_errors=0 sent=2625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2750 rate_hz=124.77 read_ok=2750 read_errors=0 sent=2750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2875 rate_hz=124.78 read_ok=2875 read_errors=0 sent=2875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3000 rate_hz=124.74 read_ok=3000 read_errors=0 sent=3000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3125 rate_hz=124.75 read_ok=3125 read_errors=0 sent=3125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3250 rate_hz=124.76 read_ok=3250 read_errors=0 sent=3250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3375 rate_hz=124.77 read_ok=3375 read_errors=0 sent=3375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3500 rate_hz=124.78 read_ok=3500 read_errors=0 sent=3500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3625 rate_hz=124.79 read_ok=3625 read_errors=0 sent=3625 send_errors=0 powered=1 enabled=1 dragging=0
+operator summary samples=3743 read_ok=3743 read_errors=0 sent=3743 send_errors=0 max_publish_interval_ms=19.906768 max_operator_joint_call_ms=12.994489 max_operator_status_call_ms=5.570053 max_operator_drag_call_ms=2.749811 missed_periods=7 logout_ret=0
+operator exit code: 0
+tracking exit code: 0

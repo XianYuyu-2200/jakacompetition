@@ -1,0 +1,97 @@
+# 赛场定义 —— 唯一真源(single source of truth)
+# 尺寸单位: 米(m)。坐标系: 基座安装面中心为原点, +z 向上, +y 指向工位区。
+# 任何改动都必须通过 `ros2 run jaka_competition_kit arena_check` 校验。
+frame_id: world
+base_link: Link_0
+tcp_link: dummy_tcp
+group_name: jaka_minicobo
+
+# 有效作业带(工具轴竖直向下), 来自 MoveIt 实测, 见 design/规则校核报告.md
+work_band:
+  r_min: 0.180
+  r_max: 0.420
+  grasp_heights: [0.03, 0.05, 0.12, 0.20]
+
+# 工具竖直向下的姿态(绕 X 转 180 度)
+tool_down_quat: [1.0, 0.0, 0.0, 0.0]
+
+# 末端几何 —— URDF 里没有夹爪模型, 必须显式建模, 否则法兰会插进工件里
+tool:
+  # Link_6 网格在 dummy_tcp 下方延伸的高度(实测 39mm)。TCP 到这个高度之间
+  # 都是实体, 抓取时工件顶面必须低于它。
+  flange_height: 0.040
+  # 工件顶面到法兰底面的安全间隙
+  clearance: 0.006
+  # 预抓取点比抓取点再抬高多少
+  approach_lift: 0.035
+  # 料盒底板厚度(工件要落在它上面)
+  bin_floor: 0.008
+  # 释放时工件底面离料盒底板的最小间隙。
+  # 不能太小: MoveIt 的位置约束是个 5mm 的球, 实际落点可能偏低,
+  # 3mm 的余量会被吃掉 -> 工件与料盒底板报碰撞 -> 规划直接返回
+  # INVALID_MOTION_PLAN(-2)。留 12mm 等价于"离底 12mm 松手让它掉下去",
+  # 真实作业里本来也是这么放的。
+  release_margin: 0.012
+  # 附着工件后允许与之接触的连杆(不参与碰撞) —— 必须显式列出,
+  # 否则工件会一直和法兰/腕部报碰撞
+  touch_links: [dummy_tcp, Link_6, Link_5, Link_4]
+
+# 安全复位位姿(所有失败处理都退回这里)
+home:
+  xy: [0.0, 0.280]
+  z: 0.220
+
+table:
+  center: [-0.02, 0.30]
+  size: [0.90, 0.70]
+  thickness: 0.02
+  top_z: -0.001          # 台面略低于基座安装面, 避免贴面误判
+
+track1:
+  station_pitch: 0.150
+  array_center_r: 0.280
+  station_size: 0.100
+  station_thickness: 0.003
+  # 料盒只按**中心**判可达性(工件就投在中心点上), 外缘允许超出作业带。
+  # 尺寸不能再小: 150x100 的内腔(130x80)连 6 个 50mm 方块都放不下,
+  # 而且侧墙离工件只有 15mm, RRTConnect 末段甩一下就把工件怼到墙上
+  # (报 "Computed path is not valid"), 表现为 place 时好时坏。
+  # 200x150 内腔 180x130: 放得下 6 件, 侧墙余量 40-65mm。
+  bin:
+    center: [0.315, 0.180]
+    size: [0.200, 0.150]
+    height: 0.040
+  qr:
+    center: [0.0, 0.110]
+    size: 0.060
+  # 抓取时 TCP 的高度不写死: 由场景生成器按工件实际中心高度给出(见 scene 真值里的 z)
+  # release_z 不写死: 由 release_tcp_z() 按工件尺寸算
+  workpieces:
+    - {id: cube,     name: 正方体,   size: 0.050}
+    - {id: rod,      name: 长方体,   size: 0.050}
+    - {id: cylinder, name: 圆柱体,   size: 0.050}
+    - {id: hex,      name: 六角柱,   size: 0.050}
+    - {id: tri,      name: 三角柱,   size: 0.050}
+    - {id: cone,     name: 圆台,     size: 0.050}
+
+track2:
+  scatter:
+    # 矩形散放区 x[-175,175] y[190,350] mm。
+    #   最近点 (0,190)      r = 190mm  -> 在下界 180mm 之外, 且不在基座本体上
+    #   最远角 (175,350)    r = 391mm  -> 距上界 420mm 留 29mm 余量
+    # 注意: 判据是"最近点"而不是"近角"。若取 center_y=230/size_y=250,
+    # 近边中点 (0,105) 只有 r=105mm —— 落在基座回转体里, 抓不到;
+    # MoveIt 用 /compute_ik 实测该点确实无解(见 design/scatter_probe.py)。
+    # 还要管"预抓取高度": 工件越高, 预抓取点越高(z=size+81mm), 可达半径越小。
+    # 本区间在 z=166mm 处实测仍整块可达。
+    center: [0.0, 0.270]
+    size: [0.350, 0.160]   # x 向 350mm, y 向 160mm
+  bin:
+    center: [0.310, 0.200]
+    size: [0.200, 0.150]
+    height: 0.100
+  objects_total: 20
+  objects_per_round: 12
+  min_gap: 0.010           # 工件之间最小间隙
+  object_size_range: [0.035, 0.075]
+  # release_z 由 release_tcp_z() 按工件尺寸算

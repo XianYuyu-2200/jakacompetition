@@ -1,0 +1,43 @@
+try to connect: 192.168.0.101
+connect success
+master login ret=0
+
+[MASTER before follower login] 192.168.0.101
+status ret=0
+powered_on=0, enabled=0, errcode=0
+joint ret=0
+J1: 0.000000 rad, 0.000000 deg
+J2: 0.000000 rad, 0.000000 deg
+J3: 0.000000 rad, 0.000000 deg
+J4: 0.000000 rad, 0.000000 deg
+J5: 0.000000 rad, 0.000000 deg
+J6: 0.000000 rad, 0.000000 deg
+try to connect: 192.168.0.102
+connect success
+
+follower login ret=0
+
+[MASTER after follower login] 192.168.0.101
+status ret=0
+powered_on=0, enabled=0, errcode=2105603
+joint ret=0
+J1: 0.006342 rad, 0.363368 deg
+J2: 2.158033 rad, 123.646174 deg
+J3: -2.077715 rad, -119.044319 deg
+J4: -0.000805 rad, -0.046108 deg
+J5: -1.637826 rad, -93.840541 deg
+J6: -1.580558 rad, -90.559301 deg
+
+[FOLLOWER] 192.168.0.102
+status ret=0
+powered_on=0, enabled=0, errcode=0
+joint ret=0
+J1: 0.006342 rad, 0.363368 deg
+J2: 2.158033 rad, 123.646174 deg
+J3: -2.077715 rad, -119.044319 deg
+J4: -0.000805 rad, -0.046108 deg
+J5: -1.637826 rad, -93.840541 deg
+J6: -1.580558 rad, -90.559301 deg
+
+follower logout ret=0
+master logout ret=0

@@ -1,0 +1,18 @@
+Six-joint follow test: 192.168.0.101 -> 192.168.0.102
+J1-J6 relative motion is 1:1
+No automatic robot power-on or robot enable
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+six-joint follower login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+operator zero captured sequence=287
+servo_move_enable_ret=-61
+six-joint follow summary commands=0 state_samples=0 stop_reason=SERVO_ENABLE_FAILED active_duration_sec=0.000000 avg_latency_ms=0.000000 max_latency_ms=0.000000 avg_error_deg=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] max_error_deg=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] abort_ret=0 servo_disable_ret=0 logout_ret=0
+operator sequence=125 rate_hz=124.84 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=122.46 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=375 rate_hz=122.65 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=1
+operator summary samples=415 read_ok=415 read_errors=0 sent=415 send_errors=0 max_publish_interval_ms=26.556694 max_operator_joint_call_ms=15.415137 max_operator_status_call_ms=18.970693 max_operator_drag_call_ms=3.708127 missed_periods=11 logout_ret=0
+operator exit code: 0
+six-joint follower exit code: 5

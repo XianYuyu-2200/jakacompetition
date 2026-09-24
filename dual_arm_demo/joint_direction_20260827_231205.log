@@ -1,0 +1,184 @@
+operator arm: 192.168.0.101
+tracking arm: 192.168.0.102
+data flow: 192.168.0.101 -> 192.168.0.102
+dry-run only: no robot motion commands
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+tracking dry-run login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=27.135 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=24.474 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run state=HOLD age_ms=26.982 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=WAITING operator_ready=0 tracking_ready=1 operator_powered=1 operator_enabled=1 operator_dragging=0 tracking_powered=1
+dry-run mapper=ARMED leader_sequence=1211
+dry-run sequence=1249 latency_ms=0.029272 leader_q=[1.891139, 0.069297, -1.429856, -0.234182, -1.716586, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] error_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+dry-run sequence=1374 latency_ms=0.032755 leader_q=[1.772388, 0.069297, -1.429856, -0.234206, -1.716550, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.118725, 2.101491, -2.094901, -0.000002, -1.574957, -0.000007] error_q=[-0.118752, 0.000000, 0.000000, -0.000024, 0.000036, 0.000000]
+dry-run state=HOLD age_ms=28.555 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=1499 latency_ms=0.112397 leader_q=[1.588574, 0.069297, -1.429856, -0.234182, -1.716358, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.302539, 2.101491, -2.094901, 0.000022, -1.574765, -0.000007] error_q=[-0.302566, 0.000000, 0.000000, 0.000000, 0.000228, 0.000000]
+dry-run sequence=1624 latency_ms=0.100337 leader_q=[1.588574, 0.270812, -1.429844, -0.234170, -1.659481, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.302539, 2.303006, -2.094889, 0.000034, -1.517888, -0.000007] error_q=[-0.302566, 0.201515, 0.000012, 0.000012, 0.057105, 0.000000]
+dry-run sequence=1749 latency_ms=0.083095 leader_q=[1.588574, 0.321793, -1.429880, -0.234170, -1.644776, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.302539, 2.353987, -2.094925, 0.000034, -1.503184, -0.000007] error_q=[-0.302566, 0.252496, -0.000024, 0.000012, 0.071809, 0.000000]
+dry-run sequence=1874 latency_ms=0.097523 leader_q=[1.588574, 0.321769, -1.652750, -0.234182, -1.644668, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.302539, 2.353963, -2.317795, 0.000022, -1.503076, -0.000007] error_q=[-0.302566, 0.252472, -0.222895, 0.000000, 0.071917, 0.000000]
+dry-run sequence=1999 latency_ms=0.095775 leader_q=[1.621375, 0.321757, -1.652822, -0.049589, -1.644285, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.269739, 2.353951, -2.317867, 0.184615, -1.502692, -0.000007] error_q=[-0.269765, 0.252460, -0.222966, 0.184593, 0.072301, 0.000000]
+dry-run sequence=2124 latency_ms=0.034385 leader_q=[1.660443, 0.321757, -1.652822, 0.144243, -1.636399, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317867, 0.378448, -1.494807, -0.000007] error_q=[-0.230696, 0.252460, -0.222966, 0.378426, 0.080186, 0.000000]
+dry-run sequence=2249 latency_ms=0.102129 leader_q=[1.660443, 0.321757, -1.652822, 0.144219, -1.360810, 0.407035] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317867, 0.378424, -1.219217, -0.000007] error_q=[-0.230696, 0.252460, -0.222966, 0.378402, 0.355776, 0.000000]
+dry-run sequence=2374 latency_ms=0.019483 leader_q=[1.660443, 0.321757, -1.652834, 0.144124, -1.416908, 0.357456] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317879, 0.378328, -1.275316, -0.049585] error_q=[-0.230696, 0.252460, -0.222978, 0.378306, 0.299678, -0.049579]
+dry-run sequence=2499 latency_ms=0.119005 leader_q=[1.660443, 0.321757, -1.652559, 0.144124, -1.349101, -0.039725] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317604, 0.378328, -1.207509, -0.446766] error_q=[-0.230696, 0.252460, -0.222703, 0.378306, 0.367484, -0.446760]
+dry-run sequence=2624 latency_ms=0.101981 leader_q=[1.660443, 0.321757, -1.652571, 0.144124, -1.310680, -0.040012] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317616, 0.378328, -1.169087, -0.447054] error_q=[-0.230696, 0.252460, -0.222715, 0.378306, 0.405906, -0.447048]
+dry-run sequence=2749 latency_ms=1.648769 leader_q=[1.660443, 0.321769, -1.652403, 0.144124, -1.310692, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353963, -2.317448, 0.378328, -1.169099, -0.447042] error_q=[-0.230696, 0.252472, -0.222547, 0.378306, 0.405894, -0.447036]
+dry-run sequence=2874 latency_ms=0.100296 leader_q=[1.660443, 0.321769, -1.652475, 0.144124, -1.310680, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353963, -2.317520, 0.378328, -1.169087, -0.447042] error_q=[-0.230696, 0.252472, -0.222619, 0.378306, 0.405906, -0.447036]
+dry-run state=HOLD age_ms=26.525 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+operator sequence=125 rate_hz=125.88 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=124.37 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=375 rate_hz=123.92 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=500 rate_hz=124.19 read_ok=500 read_errors=0 sent=500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=625 rate_hz=124.36 read_ok=625 read_errors=0 sent=625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=750 rate_hz=124.46 read_ok=750 read_errors=0 sent=750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=875 rate_hz=124.12 read_ok=875 read_errors=0 sent=875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1000 rate_hz=124.22 read_ok=1000 read_errors=0 sent=1000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1125 rate_hz=124.31 read_ok=1125 read_errors=0 sent=1125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=1250 rate_hz=124.39 read_ok=1250 read_errors=0 sent=1250 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1375 rate_hz=124.43 read_ok=1375 read_errors=0 sent=1375 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1500 rate_hz=124.32 read_ok=1500 read_errors=0 sent=1500 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1625 rate_hz=124.37 read_ok=1625 read_errors=0 sent=1625 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1750 rate_hz=124.35 read_ok=1750 read_errors=0 sent=1750 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1875 rate_hz=124.39 read_ok=1875 read_errors=0 sent=1875 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2000 rate_hz=124.43 read_ok=2000 read_errors=0 sent=2000 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2125 rate_hz=124.46 read_ok=2125 read_errors=0 sent=2125 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2250 rate_hz=124.44 read_ok=2250 read_errors=0 sent=2250 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2375 rate_hz=124.46 read_ok=2375 read_errors=0 sent=2375 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2500 rate_hz=124.44 read_ok=2500 read_errors=0 sent=2500 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=2625 rate_hz=124.47 read_ok=2625 read_errors=0 sent=2625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2750 rate_hz=124.45 read_ok=2750 read_errors=0 sent=2750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2875 rate_hz=124.47 read_ok=2875 read_errors=0 sent=2875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3000 rate_hz=124.50 read_ok=3000 read_errors=0 sent=3000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3125 rate_hz=124.47 read_ok=3125 read_errors=0 sent=3125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3250 rate_hz=124.50 read_ok=3250 read_errors=0 sent=3250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3375 rate_hz=124.44 read_ok=3375 read_errors=0 sent=3375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3500 rate_hz=124.46 read_ok=3500 read_errors=0 sent=3500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3625 rate_hz=124.48 read_ok=3625 read_errors=0 sent=3625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3750 rate_hz=124.46 read_ok=3750 read_errors=0 sent=3750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=3875 rate_hz=124.48 read_ok=3875 read_errors=0 sent=3875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4000 rate_hz=124.44 read_ok=4000 read_errors=0 sent=4000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4125 rate_hz=124.45 read_ok=4125 read_errors=0 sent=4125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4250 rate_hz=124.46 read_ok=4250 read_errors=0 sent=4250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4375 rate_hz=124.48dry-run sequence=2999 latency_ms=0.034232 leader_q=[1.660443, 0.321757, -1.652607, 0.144112, -1.310680, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317651, 0.378316, -1.169087, -0.447042] error_q=[-0.230696, 0.252460, -0.222751, 0.378294, 0.405906, -0.447036]
+dry-run sequence=3124 latency_ms=0.106673 leader_q=[1.660443, 0.321757, -1.652595, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317639, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252460, -0.222739, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3249 latency_ms=0.070685 leader_q=[1.660443, 0.321757, -1.652583, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317628, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252460, -0.222727, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3374 latency_ms=0.086680 leader_q=[1.660443, 0.321757, -1.652571, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353951, -2.317616, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252460, -0.222715, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3499 latency_ms=0.009293 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3624 latency_ms=0.017533 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3749 latency_ms=0.019616 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3874 latency_ms=0.036196 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=3999 latency_ms=5.949313 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4124 latency_ms=0.019721 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4249 latency_ms=0.101253 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4374 latency_ms=0.107980 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4499 latency_ms=0.107302 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4624 latency_ms=0.018068 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run state=HOLD age_ms=24.933 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=4749 latency_ms=0.019287 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=4874 latency_ms=0.036028 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run state=HOLD age_ms=27.541 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=4999 latency_ms=0.100300 leader_q=[1.660443, 0.321745, -1.652559, 0.144124, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378328, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378306, 0.405918, -0.447036]
+dry-run sequence=5124 latency_ms=0.087107 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5249 latency_ms=0.098698 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5374 latency_ms=0.030188 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5499 latency_ms=0.091037 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5624 latency_ms=0.083421 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5749 latency_ms=0.018669 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5874 latency_ms=0.020846 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=5999 latency_ms=0.055188 leader_q=[1.660443, 0.321745, -1.652547, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317592, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222691, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6124 latency_ms=0.085793 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6249 latency_ms=0.019198 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6374 latency_ms=0.094398 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6499 latency_ms=0.091221 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6624 latency_ms=0.100894 leader_q=[1.660443, 0.321745, -1.652547, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317592, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222691, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6749 latency_ms=0.016459 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.039988] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447030] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447024]
+dry-run sequence=6874 latency_ms=0.102883 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=6999 latency_ms=0.033356 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7124 latency_ms=0.025838 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run state=HOLD age_ms=37.629 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=7249 latency_ms=0.115567 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7374 latency_ms=0.040229 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7499 latency_ms=0.091625 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7624 latency_ms=0.184735 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7749 latency_ms=0.090075 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7874 latency_ms=0.042634 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=7999 latency_ms=0.032094 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run state=HOLD age_ms=24.231 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=8124 latency_ms=0.111834 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8249 latency_ms=0.008560 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8374 latency_ms=0.033465 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run state=HOLD age_ms=24.311 reason=DATA_STALE
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+ read_ok=4375 read_errors=0 sent=4375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4500 rate_hz=124.47 read_ok=4500 read_errors=0 sent=4500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4625 rate_hz=124.43 read_ok=4625 read_errors=0 sent=4625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4750 rate_hz=124.41 read_ok=4750 read_errors=0 sent=4750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=4875 rate_hz=124.41 read_ok=4875 read_errors=0 sent=4875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5000 rate_hz=124.42 read_ok=5000 read_errors=0 sent=5000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5125 rate_hz=124.44 read_ok=5125 read_errors=0 sent=5125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5250 rate_hz=124.45 read_ok=5250 read_errors=0 sent=5250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5375 rate_hz=124.46 read_ok=5375 read_errors=0 sent=5375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5500 rate_hz=124.45 read_ok=5500 read_errors=0 sent=5500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5625 rate_hz=124.44 read_ok=5625 read_errors=0 sent=5625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5750 rate_hz=124.45 read_ok=5750 read_errors=0 sent=5750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=5875 rate_hz=124.47 read_ok=5875 read_errors=0 sent=5875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6000 rate_hz=124.46 read_ok=6000 read_errors=0 sent=6000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6125 rate_hz=124.47 read_ok=6125 read_errors=0 sent=6125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6250 rate_hz=124.48 read_ok=6250 read_errors=0 sent=6250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6375 rate_hz=124.49 read_ok=6375 read_errors=0 sent=6375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6500 rate_hz=124.50 read_ok=6500 read_errors=0 sent=6500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6625 rate_hz=124.51 read_ok=6625 read_errors=0 sent=6625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6750 rate_hz=124.50 read_ok=6750 read_errors=0 sent=6750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=6875 rate_hz=124.51 read_ok=6875 read_errors=0 sent=6875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7000 rate_hz=124.52 read_ok=7000 read_errors=0 sent=7000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7125 rate_hz=124.52 read_ok=7125 read_errors=0 sent=7125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7250 rate_hz=124.50 read_ok=7250 read_errors=0 sent=7250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7375 rate_hz=124.47 read_ok=7375 read_errors=0 sent=7375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7500 rate_hz=124.45 read_ok=7500 read_errors=0 sent=7500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7625 rate_hz=124.46 read_ok=7625 read_errors=0 sent=7625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7750 rate_hz=124.45 read_ok=7750 read_errors=0 sent=7750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=7875 rate_hz=124.46 read_ok=7875 read_errors=0 sent=7875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8000 rate_hz=124.47 read_ok=8000 read_errors=0 sent=8000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8125 rate_hz=124.48 read_ok=8125 read_errors=0 sent=8125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8250 rate_hz=124.49 read_ok=8250 read_errors=0 sent=8250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8375 rate_hz=124.49 read_ok=8375 read_errors=0 sent=8375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8500 rate_hz=124.50 read_ok=8500 read_errors=0 sent=8500 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8625 rate_hz=124.51 read_ok=8625 redry-run sequence=8499 latency_ms=0.095399 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8624 latency_ms=0.029289 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8749 latency_ms=0.035108 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8874 latency_ms=0.092909 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=8999 latency_ms=0.016567 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=9124 latency_ms=0.034766 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run sequence=9249 latency_ms=0.017345 leader_q=[1.660443, 0.321745, -1.652559, 0.144112, -1.310668, -0.040000] tracking_q=[0.000026, 2.101491, -2.094901, 0.000022, -1.574993, -0.000007] target_q=[-0.230670, 2.353939, -2.317604, 0.378316, -1.169075, -0.447042] error_q=[-0.230696, 0.252448, -0.222703, 0.378294, 0.405918, -0.447036]
+dry-run summary received=9336 valid=9336 invalid=0 sdk_errors=0 tracking_read_errors=0 sequence_gaps=0 metrics_samples=8125 avg_latency_ms=0.235270 max_latency_ms=30.350073 max_abs_error_rad=0.447119 max_receive_interval_ms=37.636592 max_tracking_joint_call_ms=23.292038 max_tracking_status_call_ms=36.526247 mapper_armed=1 final_state=FRESH tracking_pose_valid=1 logout_ret=0
+ad_errors=0 sent=8625 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8750 rate_hz=124.50 read_ok=8750 read_errors=0 sent=8750 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=8875 rate_hz=124.49 read_ok=8875 read_errors=0 sent=8875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=9000 rate_hz=124.50 read_ok=9000 read_errors=0 sent=9000 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=9125 rate_hz=124.51 read_ok=9125 read_errors=0 sent=9125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=9250 rate_hz=124.51 read_ok=9250 read_errors=0 sent=9250 send_errors=0 powered=1 enabled=1 dragging=0
+operator summary samples=9338 read_ok=9338 read_errors=0 sent=9338 send_errors=0 logout_ret=0
+operator exit code: 0
+tracking exit code: 0

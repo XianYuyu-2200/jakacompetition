@@ -1,0 +1,35 @@
+[FOLLOWER] PID=337386, IP=192.168.0.102
+try to connect: 192.168.0.102
+connect success
+[FOLLOWER] login_ret=0
+[FOLLOWER] sample=0, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=1, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=2, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=3, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=4, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=5, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=6, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=7, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=8, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] sample=9, status_ret=0, joint_ret=0, actual_ret=0, powered_on=0, enabled=0, errcode=0
+[FOLLOWER] joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] actual_joints_rad=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007]
+[FOLLOWER] logout_ret=0

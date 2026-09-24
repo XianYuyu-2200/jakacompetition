@@ -1,0 +1,12 @@
+try to connect: 192.168.0.102
+connect success
+follower dry-run login_ret=0 ip=192.168.0.102
+dry-run mapper=ARMED leader_sequence=0
+dry-run state=FRESH age_ms=0.000 reason=DATA_RECEIVED
+dry-run sequence=124 latency_ms=0.032094 leader_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] follower_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] target_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] error_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+dry-run sequence=249 latency_ms=0.020843 leader_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] follower_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] target_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] error_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+dry-run sequence=374 latency_ms=0.019442 leader_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] follower_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] target_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] error_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+dry-run sequence=499 latency_ms=0.078614 leader_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000] follower_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] target_q=[0.000026, 2.101491, -2.094865, 0.000022, -1.574993, -0.000007] error_q=[0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000]
+dry-run state=HOLD age_ms=27.097 reason=DATA_STALE
+dry-run state=FAULT age_ms=104.513 reason=DATA_TIMEOUT
+dry-run summary received=500 valid=500 invalid=0 sdk_errors=0 follower_read_errors=0 sequence_gaps=0 metrics_samples=500 avg_latency_ms=0.051092 max_latency_ms=0.265218 max_abs_error_rad=0.000000 mapper_armed=1 final_state=FAULT follower_pose_valid=1 logout_ret=0

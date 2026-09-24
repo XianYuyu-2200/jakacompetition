@@ -1,0 +1,6 @@
+try to connect: 192.168.0.101
+connect success
+leader login_ret=0 ip=192.168.0.101
+leader sequence=125 rate_hz=124.81 read_ok=125 read_errors=0 sent=125 send_errors=0
+leader sequence=250 rate_hz=124.94 read_ok=250 read_errors=0 sent=250 send_errors=0
+leader summary samples=374 read_ok=374 read_errors=0 sent=374 send_errors=0 logout_ret=0

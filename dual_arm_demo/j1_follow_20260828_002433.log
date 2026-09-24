@@ -1,0 +1,92 @@
+J1 follow test: 192.168.0.101 -> 192.168.0.102
+J1 relative motion is 1:1; J2-J6 remain at startup positions
+No automatic robot power-on or robot enable
+try to connect: 192.168.0.102
+try to connect: 192.168.0.101
+connect success
+j1 follower login_ret=0 ip=192.168.0.102
+connect success
+operator login_ret=0 ip=192.168.0.101
+operator zero captured sequence=387
+servo_move_enable_ret=0
+seq=412 operator_j1=1.710118 target_j1=0.124806 actual_j1=0.124818 error_deg=0.000687 latency_ms=0.272563
+seq=437 operator_j1=1.708452 target_j1=0.123140 actual_j1=0.124399 error_deg=0.072098 latency_ms=0.019356
+seq=462 operator_j1=1.686077 target_j1=0.100766 actual_j1=0.109790 error_deg=0.517044 latency_ms=0.106233
+seq=487 operator_j1=1.643713 target_j1=0.058401 actual_j1=0.071057 error_deg=0.725098 latency_ms=0.056463
+seq=512 operator_j1=1.607125 target_j1=0.021814 actual_j1=0.032252 error_deg=0.598068 latency_ms=0.116534
+seq=538 operator_j1=1.571209 target_j1=-0.014103 actual_j1=-0.003078 error_deg=0.631714 latency_ms=0.013185
+seq=563 operator_j1=1.547288 target_j1=-0.038024 actual_j1=-0.034716 error_deg=0.189514 latency_ms=0.048213
+seq=588 operator_j1=1.547432 target_j1=-0.037880 actual_j1=-0.036897 error_deg=0.056305 latency_ms=0.049392
+seq=613 operator_j1=1.564881 target_j1=-0.020431 actual_j1=-0.027406 error_deg=0.399628 latency_ms=0.060362
+seq=638 operator_j1=1.596100 target_j1=0.010788 actual_j1=0.001057 error_deg=0.557556 latency_ms=0.084669
+seq=663 operator_j1=1.630015 target_j1=0.044703 actual_j1=0.035044 error_deg=0.553436 latency_ms=0.052876
+seq=688 operator_j1=1.663283 target_j1=0.077972 actual_j1=0.070805 error_deg=0.410614 latency_ms=0.099360
+seq=713 operator_j1=1.694239 target_j1=0.108927 actual_j1=0.101868 error_deg=0.404434 latency_ms=4.900944
+seq=739 operator_j1=1.710669 target_j1=0.125357 actual_j1=0.123524 error_deg=0.105057 latency_ms=0.046061
+seq=764 operator_j1=1.710609 target_j1=0.125297 actual_j1=0.124974 error_deg=0.018539 latency_ms=0.053009
+seq=789 operator_j1=1.697283 target_j1=0.111971 actual_j1=0.117831 error_deg=0.335770 latency_ms=0.006129
+seq=815 operator_j1=1.660467 target_j1=0.075155 actual_j1=0.086229 error_deg=0.634460 latency_ms=0.093005
+seq=843 operator_j1=1.623544 target_j1=0.038232 actual_j1=0.046885 error_deg=0.495758 latency_ms=0.092008
+seq=868 operator_j1=1.598844 target_j1=0.013533 actual_j1=0.019081 error_deg=0.317917 latency_ms=3.941581
+seq=893 operator_j1=1.573198 target_j1=-0.012114 actual_j1=-0.005115 error_deg=0.401001 latency_ms=0.012341
+seq=918 operator_j1=1.557750 target_j1=-0.027561 actual_j1=-0.025332 error_deg=0.127716 latency_ms=0.886815
+seq=943 operator_j1=1.557631 target_j1=-0.027681 actual_j1=-0.027322 error_deg=0.020599 latency_ms=0.225532
+seq=969 operator_j1=1.557642 target_j1=-0.027669 actual_j1=-0.027406 error_deg=0.015106 latency_ms=0.617314
+seq=994 operator_j1=1.557738 target_j1=-0.027573 actual_j1=-0.027513 error_deg=0.003433 latency_ms=0.050517
+seq=1019 operator_j1=1.558673 target_j1=-0.026639 actual_j1=-0.027058 error_deg=0.024033 latency_ms=0.016733
+seq=1044 operator_j1=1.558661 target_j1=-0.026651 actual_j1=-0.026938 error_deg=0.016479 latency_ms=0.014993
+seq=1069 operator_j1=1.558661 target_j1=-0.026651 actual_j1=-0.026699 error_deg=0.002747 latency_ms=1.932496
+seq=1094 operator_j1=1.558661 target_j1=-0.026651 actual_j1=-0.026758 error_deg=0.006180 latency_ms=0.007808
+seq=1119 operator_j1=1.558661 target_j1=-0.026651 actual_j1=-0.026723 error_deg=0.004120 latency_ms=1.922885
+seq=1144 operator_j1=1.558697 target_j1=-0.026615 actual_j1=-0.026399 error_deg=0.012360 latency_ms=0.056304
+seq=1169 operator_j1=1.575475 target_j1=-0.009837 actual_j1=-0.017722 error_deg=0.451813 latency_ms=1.117126
+seq=1194 operator_j1=1.616940 target_j1=0.031629 actual_j1=0.019752 error_deg=0.680466 latency_ms=2.185698
+seq=1219 operator_j1=1.662720 target_j1=0.077408 actual_j1=0.064418 error_deg=0.744324 latency_ms=1.302508
+seq=1246 operator_j1=1.704042 target_j1=0.118730 actual_j1=0.109622 error_deg=0.521851 latency_ms=0.111221
+seq=1271 operator_j1=1.719633 target_j1=0.134322 actual_j1=0.133375 error_deg=0.054245 latency_ms=0.638735
+seq=1297 operator_j1=1.711927 target_j1=0.126616 actual_j1=0.131733 error_deg=0.293198 latency_ms=0.105895
+seq=1322 operator_j1=1.667250 target_j1=0.081938 actual_j1=0.099939 error_deg=1.031342 latency_ms=0.063549
+seq=1347 operator_j1=1.608959 target_j1=0.023647 actual_j1=0.043901 error_deg=1.160431 latency_ms=0.011305
+seq=1372 operator_j1=1.551806 target_j1=-0.033506 actual_j1=-0.011431 error_deg=1.264801 latency_ms=0.039308
+seq=1397 operator_j1=1.498392 target_j1=-0.086919 actual_j1=-0.058445 error_deg=1.631470 latency_ms=0.580339
+seq=1422 operator_j1=1.462200 target_j1=-0.123112 actual_j1=-0.106801 error_deg=0.934525 latency_ms=0.020683
+seq=1447 operator_j1=1.447759 target_j1=-0.137553 actual_j1=-0.132459 error_deg=0.291824 latency_ms=0.103319
+seq=1472 operator_j1=1.450863 target_j1=-0.134449 actual_j1=-0.134425 error_deg=0.001373 latency_ms=0.005831
+seq=1497 operator_j1=1.486876 target_j1=-0.098436 actual_j1=-0.110037 error_deg=0.664673 latency_ms=0.014311
+seq=1523 operator_j1=1.538671 target_j1=-0.046640 actual_j1=-0.071939 error_deg=1.449509 latency_ms=0.032956
+seq=1548 operator_j1=1.587615 target_j1=0.002303 actual_j1=-0.025896 error_deg=1.615677 latency_ms=0.112025
+seq=1573 operator_j1=1.633886 target_j1=0.048574 actual_j1=0.024678 error_deg=1.369171 latency_ms=0.563759
+seq=1598 operator_j1=1.673326 target_j1=0.088014 actual_j1=0.068816 error_deg=1.100006 latency_ms=0.010311
+seq=1623 operator_j1=1.708800 target_j1=0.123488 actual_j1=0.108555 error_deg=0.855560 latency_ms=0.589093
+seq=1648 operator_j1=1.727447 target_j1=0.142135 actual_j1=0.137425 error_deg=0.269852 latency_ms=0.108043
+seq=1674 operator_j1=1.727471 target_j1=0.142159 actual_j1=0.140865 error_deg=0.074158 latency_ms=2.619001
+seq=1700 operator_j1=1.714420 target_j1=0.129108 actual_j1=0.136850 error_deg=0.443573 latency_ms=0.007570
+seq=1725 operator_j1=1.669383 target_j1=0.084072 actual_j1=0.105200 error_deg=1.210556 latency_ms=0.030251
+seq=1751 operator_j1=1.615323 target_j1=0.030011 actual_j1=0.059300 error_deg=1.678162 latency_ms=0.553183
+seq=1777 operator_j1=1.562760 target_j1=-0.022552 actual_j1=0.025421 error_deg=2.748642 latency_ms=0.119895
+seq=1803 operator_j1=1.531397 target_j1=-0.053915 actual_j1=-0.031265 error_deg=1.297760 latency_ms=0.096933
+seq=1828 operator_j1=1.521918 target_j1=-0.063394 actual_j1=-0.055317 error_deg=0.462799 latency_ms=0.662379
+seq=1854 operator_j1=1.521929 target_j1=-0.063382 actual_j1=-0.060890 error_deg=0.142822 latency_ms=0.009903
+j1 follow summary samples=291 commands=1457 avg_latency_ms=0.686160 max_latency_ms=7.647900 avg_error_deg=0.544625 max_error_deg=2.748642 logout_ret=0
+operator sequence=125 rate_hz=125.87 read_ok=125 read_errors=0 sent=125 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=250 rate_hz=125.42 read_ok=250 read_errors=0 sent=250 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=375 rate_hz=125.26 read_ok=375 read_errors=0 sent=375 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=500 rate_hz=124.94 read_ok=500 read_errors=0 sent=500 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=625 rate_hz=124.76 read_ok=625 read_errors=0 sent=625 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=750 rate_hz=124.63 read_ok=750 read_errors=0 sent=750 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=875 rate_hz=124.55 read_ok=875 read_errors=0 sent=875 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1000 rate_hz=124.61 read_ok=1000 read_errors=0 sent=1000 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1125 rate_hz=124.65 read_ok=1125 read_errors=0 sent=1125 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1250 rate_hz=124.68 read_ok=1250 read_errors=0 sent=1250 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1375 rate_hz=124.63 read_ok=1375 read_errors=0 sent=1375 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1500 rate_hz=124.57 read_ok=1500 read_errors=0 sent=1500 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1625 rate_hz=124.61 read_ok=1625 read_errors=0 sent=1625 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1750 rate_hz=124.63 read_ok=1750 read_errors=0 sent=1750 send_errors=0 powered=1 enabled=1 dragging=1
+operator sequence=1875 rate_hz=124.66 read_ok=1875 read_errors=0 sent=1875 send_errors=0 powered=1 enabled=1 dragging=0
+operator sequence=2000 rate_hz=124.68 read_ok=2000 read_errors=0 sent=1883 send_errors=117 powered=1 enabled=1 dragging=0
+operator sequence=2125 rate_hz=124.70 read_ok=2125 read_errors=0 sent=1883 send_errors=242 powered=1 enabled=1 dragging=0
+operator sequence=2250 rate_hz=124.66 read_ok=2250 read_errors=0 sent=1883 send_errors=367 powered=1 enabled=1 dragging=0
+operator sequence=2375 rate_hz=124.68 read_ok=2375 read_errors=0 sent=1883 send_errors=492 powered=1 enabled=1 dragging=0
+operator summary samples=2492 read_ok=2492 read_errors=0 sent=1883 send_errors=609 max_publish_interval_ms=20.609279 max_operator_joint_call_ms=13.909595 max_operator_status_call_ms=3.500409 max_operator_drag_call_ms=1.182121 missed_periods=9 logout_ret=0
+operator exit code: 0
+J1 follower exit code: 0
