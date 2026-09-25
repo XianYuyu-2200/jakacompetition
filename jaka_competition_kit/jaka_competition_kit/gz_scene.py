@@ -172,15 +172,31 @@ class GazeboSceneMirror(Node):
     def _ingest(self, msg: PlanningScene) -> None:
         target: Dict[str, Item] = {}
 
-        def add(obj_id: str, prim, pose_holder, frame_id: str) -> None:
+        def add(obj_id: str, prim, pose_holder, frame_id: str,
+                obj_pose=None) -> None:
             geom, half = _geometry(prim)
             if geom is None:
                 return
             p = pose_holder
-            pose = self._to_world(frame_id,
-                                  (p.position.x, p.position.y, p.position.z),
-                                  (p.orientation.x, p.orientation.y,
-                                   p.orientation.z, p.orientation.w))
+            # ⚠️ 踩过的坑: ``moveit_msgs/CollisionObject`` 里 ``pose`` 是物体
+            # 自身的位姿, ``primitive_poses`` 是**相对它**的。从
+            # ``/get_planning_scene`` 读回来时 MoveIt 已经把位姿折叠进
+            # ``CollisionObject.pose``、并把 ``primitive_poses`` 清零 ——
+            # 只看 ``primitive_poses`` 的话每个场地几何都会落在世界原点:
+            # 台面/工位板/料盒/工件全部叠在基座底下, Gazebo 画面里除了机械臂
+            # 什么都看不见(而且它们还会把地面一起压下去)。
+            base_pos = (0.0, 0.0, 0.0)
+            base_quat = (0.0, 0.0, 0.0, 1.0)
+            if obj_pose is not None:
+                base_pos = (obj_pose.position.x, obj_pose.position.y,
+                            obj_pose.position.z)
+                base_quat = (obj_pose.orientation.x, obj_pose.orientation.y,
+                             obj_pose.orientation.z, obj_pose.orientation.w)
+            pos, quat = _compose(base_pos, base_quat,
+                                 (p.position.x, p.position.y, p.position.z),
+                                 (p.orientation.x, p.orientation.y,
+                                  p.orientation.z, p.orientation.w))
+            pose = self._to_world(frame_id, pos, quat)
             if pose is None:
                 return
             name = self._prefix + obj_id
@@ -189,14 +205,14 @@ class GazeboSceneMirror(Node):
         for obj in msg.world.collision_objects:
             if obj.primitives and obj.primitive_poses:
                 add(obj.id, obj.primitives[0], obj.primitive_poses[0],
-                    obj.header.frame_id)
+                    obj.header.frame_id, obj.pose)
 
         # 已抓取的工件: 位姿是相对末端连杆的, 要过一遍 TF
         for aco in msg.robot_state.attached_collision_objects:
             obj = aco.object
             if obj.primitives and obj.primitive_poses:
                 add(obj.id, obj.primitives[0], obj.primitive_poses[0],
-                    aco.link_name)
+                    aco.link_name, obj.pose)
 
         self._target = target
 

@@ -79,11 +79,28 @@ ros2 service call /competition/start std_srvs/srv/Trigger "{}"
 - `screenshots/08-gazebo-arena-mirrored.png` 场地已镜像进 Gazebo
 - `screenshots/09-gazebo-arena-running.png` 参考实现在 Gazebo 物理里执行中
 
-⚠️ 两个坑记在这里:
+> `round.launch.py` 默认会把参考实现一起起起来, 但它**只等题目 60 s**
+> (`reference.py` 的 `wait_for_scene`)。Gazebo 那条线光起服务器 + 镜像就要
+> 几十秒, 很容易还没来得及调 `/competition/generate` 它就自己退了, 日志里是
+> `没有收到题目: 先调 /competition/generate`。要跑 Gazebo 线就加
+> `run_reference:=false`, 等镜像完再手动 `ros2 run jaka_competition_kit ref_track1`。
 
-1. 本机无 GPU, Gazebo 走 llvmpipe 软渲染, **运行时 spawn 的几何有竖条纹
-   瑕疵**(机械臂本体正常)。已排除抓图工具和阴影两个原因。有独显不会这样。
+⚠️ 三个坑记在这里:
+
+1. 第一版截图里 **运行时 spawn 的几何有竖条纹瑕疵**(机械臂本体正常), 当时
+   归因成"软渲染画质差"。**不是** —— 那是 `xwd2png.py` 自己的解析 bug: 它按
+   `bytes_per_line` 而不是 `bits_per_pixel` 判断每像素几字节, 于是把 3 字节的
+   数据当 4 字节读, 整张图横向错位。同一份 `.xwd` 用 ImageMagick 解出来是干净的,
+   在软渲染和独显上都一样。解析器已修, `screenshots/08`、`09` 已重拍。
+   详见 `docs/Gazebo仿真.md` 第 4.3 节。
 2. Gazebo 线耗时 ≈ 假硬件线 × 2, **限时不能跨线复用**。
+3. **Gazebo 线跑不满 6/6**, 而且不稳定。2026-09 复测: 同一 seed(246135)、
+   同一命令下跑出 `3/6, 237.3s`, 失败集中在 `[4/6]` 之后, 报
+   `FAIL(error_code=-4)`(MoveIt 的 `CONTROL_FAILED`, 不是规划失败),
+   连带 `recover`/复位到 home 也一起失败。另外还有零星的
+   `末端在 3.0s 内没有到位(容差 2mm)` 告警。假硬件线(RViz)则是稳定的
+   6/6 —— 所以 Gazebo 这条线目前只适合"看画面 / 演示真物理", **不适合判分**,
+   要判分还是走假硬件线。这个没查下去, 谁接谁往下挖。
 
 ## 四、其他两个脚本
 

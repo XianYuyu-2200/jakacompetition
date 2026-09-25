@@ -56,8 +56,9 @@ ros2 launch jaka_competition_kit gazebo_mirror.launch.py
 > 因为假硬件模式轨迹瞬间到位、Gazebo 要按真实速度走。
 > **判分用哪条线, 限时就得按哪条线重新标定**, 不能混用。
 >
-> ⚠️ 无独显的机器上 Gazebo 走 llvmpipe 软渲染, 运行时创建的几何会有
-> 竖条纹瑕疵; 投大屏请用带 GPU 的机器。
+> ⚠️ 默认的远程桌面会话里 OpenGL 只能走 Mesa 软渲染(独显在 `:1001` 上用不了,
+> 因为那个 X server 是 NoMachine 自己实现的)。想真用上独显:
+> `bash setup/xorg-gpu.sh start`, 见 `docs/Gazebo仿真.md` 第 4 节。
 >
 > 细节见 `docs/Gazebo仿真.md`。
 

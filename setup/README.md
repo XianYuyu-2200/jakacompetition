@@ -15,6 +15,14 @@ bash setup/run-rviz-sim.sh     # 纯 RViz 仿真(假硬件, 无需 Gazebo)
 bash setup/run-gazebo-sim.sh   # Gazebo 物理仿真
 ```
 
+想让 Gazebo 真的走独显(默认的远程桌面会话用不了独显, 见下面第 6 条):
+
+```bash
+bash setup/xorg-gpu.sh start :0
+DISPLAY=:0 ros2 launch jaka_competition_kit round.launch.py world:=gazebo
+bash setup/xorg-gpu.sh stop :0
+```
+
 ## 为什么必须有第 2 步
 
 仓库里的 `jaka_ros2/src/jaka_minicobo_moveit_config/launch/demo.launch.py`
@@ -72,3 +80,10 @@ ROS 1 插件名,RViz2 会全部报
 **5. `warehouse_ros_mongo` 没有对应 apt 包。**
 本次用 `ros-humble-moveit-ros-warehouse` 替代。只有 `db:=true` 的
 warehouse 功能会受影响,仿真和规划不受影响。
+
+**6. 默认的远程桌面会话里 OpenGL 只能走 Mesa 软渲染。**
+这台机器有 RTX 5060 Ti, 但 `:1001` 不是 Xorg —— `nxnode.bin` 自己就是那个
+X server, NVIDIA 的 GLX 客户端库驱动不了它。强行设
+`__GLX_VENDOR_LIBRARY_NAME=nvidia` 会让 `glxinfo` 改口报 NVIDIA, 但
+**所有 GL 窗口(含 Gazebo 的 3D 视口)全黑**。要用独显就
+`bash setup/xorg-gpu.sh start`, 详见 `docs/Gazebo仿真.md` 第 4 节。

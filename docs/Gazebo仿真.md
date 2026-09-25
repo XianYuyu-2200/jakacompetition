@@ -90,18 +90,79 @@ Gazebo 里的这些几何默认 `collision=false`, 只是视觉。原因是它�
 - 两条线不能混用同一个限时, 否则对选手不公平;
 - 换线之后重跑 `bash design/calibrate.sh <赛道> 3`。
 
-## 4. 这台机器上的渲染质量(重要)
+## 4. 画面: 独显是有的, 但远程桌面里用不上(重要)
 
-本机 **没有 GPU**, Gazebo 走的是 Mesa **llvmpipe 软件渲染**
-(`~/.ignition/rendering/ogre2.log`: `GL_RENDERER = llvmpipe`)。在这个环境下:
+先把结论摆清楚, 因为这一段踩过坑、也写错过:
 
-- 机械臂本体(URDF 网格)和地面渲染正常;
-- 运行时 **spawn 进来的几何(台面/工位板/料盒/工件)会出现竖条纹瑕疵**
-  —— 已排除是抓图工具的问题(条纹周期约 9px, 是渲染出来的),
-  也排除了阴影(`cast_shadows=false`、关掉太阳投影都没用)。
+| 问题 | 答案 |
+|---|---|
+| 这台机器有没有独显 | **有**。NVIDIA RTX 5060 Ti, 驱动 580.178.04, 16311 MiB |
+| 默认的远程桌面会话(`:1001`)能不能用它渲染 | **不能**, 只能走 Mesa llvmpipe 软渲染 |
+| 另起一个无头 Xorg 能不能用 | **能**, `bash setup/xorg-gpu.sh start` 一条命令 |
 
-有独显的机器上不会这样。**如果比赛要投大屏, 请用带 GPU 的机器跑 Gazebo。**
-截图见 `verification/screenshots/08/09`。
+### 4.1 为什么默认会话用不上独显
+
+`:1001` 不是 Xorg。`lsof /tmp/.X11-unix/X1001` 会告诉你, 那个 socket 属于
+**`nxnode.bin`** —— NoMachine 自己实现的虚拟 X server。NVIDIA 的 GLX
+客户端库没法往这种 X server 上呈现画面。拿 `glxgears` 做对照, 同一台机器:
+
+```bash
+DISPLAY=:1001 glxgears                                   # -> 正常画出齿轮
+DISPLAY=:1001 __GLX_VENDOR_LIBRARY_NAME=nvidia glxgears  # -> 窗口全黑
+```
+
+加了这个变量之后 `glxinfo` 确实会改口报 `NVIDIA GeForce RTX 5060 Ti`,
+`~/.ignition/rendering/ogre2.log` 里也会写 `GL_VENDOR = NVIDIA Corporation`,
+**但 Gazebo 的 3D 视口是全黑的** —— 渲染结果根本没送到屏幕上。
+
+所以: **不要在远程桌面会话里设 `__GLX_VENDOR_LIBRARY_NAME=nvidia`**。
+这个坑一度被当成"修复"写进 `README` 和 launch 文件里, 2026-09 已全部撤掉。
+
+### 4.2 想真的用上独显
+
+GPU 上没接显示器(`nvidia-smi -q` 显示 `Display Attached: No`)也能起 Xorg,
+靠 `AllowEmptyInitialConfiguration` + `UseDisplayDevice "none"` 走 NoScanout:
+
+```bash
+bash setup/xorg-gpu.sh start :0
+DISPLAY=:0 glxinfo -B | grep -E "renderer|direct"
+# OpenGL renderer string: NVIDIA GeForce RTX 5060 Ti/PCIe/SSE2
+# direct rendering: Yes
+
+DISPLAY=:0 ros2 launch jaka_competition_kit round.launch.py world:=gazebo
+
+bash setup/xorg-gpu.sh stop :0
+```
+
+两个注意点:
+
+- `:0` 上**没有窗口管理器**, 新窗口不会自动置顶。用
+  `xdotool windowraise <wid>` 把 Gazebo 提到最前面再截图;
+- 反过来, `:1001` 上 Gazebo 的 Ogre 视口在这台机器上会**只画一帧就不重绘**
+  (Qt 面板照常刷新, 3D 区冻住)。要拍 Gazebo 的画面, 用 `:0`。
+
+### 4.3 曾经被当成"软渲染瑕疵"的那层竖条纹
+
+`verification/screenshots/08/09` 的早期版本里, 运行时 spawn 的几何
+(台面 / 工位板 / 料盒 / 工件) 上罩着一层很明显的竖条纹, 当时归因成
+"没有独显 / llvmpipe 画质差"。
+
+**不是渲染的问题, 是抓图工具的 bug。** `verification/xwd2png.py` 原先按
+`bytes_per_line` 去猜"每像素几字节", 而 xwd 写出来的这两个字段可以不一致 ——
+本机抓 1000 像素宽的窗口时是 `bits_per_pixel=24` 但 `bytes_per_line=4000`,
+于是它按 4 字节去读一份 3 字节的数据, 整张图被横向错位, 就长出了条纹。
+同一份 `.xwd` 用 ImageMagick 解出来是**干净的**, 在软渲染和独显上都是。
+
+现在 `xwd2png.py` 改成按 `bits_per_pixel` 取宽度、并从文件尾倒推像素起点
+(跳过 xwd 写在像素前的调色板段)。不放心的话绕开它直接用 ImageMagick:
+
+```bash
+import -window <wid> shot.png
+```
+
+顺带纠正另一个结论: **软渲染下 Gazebo 的画面本身是正常的**, 代价只是 CPU
+(`ign gazebo gui` 会吃掉好几个核)。以前说"投大屏要换带独显的机器"是错的,
+在这台机器上要的是按 4.2 起一个 Xorg。
 
 ## 5. 常用命令
 
