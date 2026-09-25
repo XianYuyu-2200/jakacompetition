@@ -16,7 +16,7 @@ codex-competition/
 ├── jaka_competition_kit/   比赛官方工具包(赛场定义 + 出题 + 计时判分 + 参考实现)
 ├── design/                 赛题设计工作区(规则校核 / 赛场尺寸实测 / 参考实现 / 配图)
 ├── jaka_ros2/              JAKA 官方 ROS 2 包(驱动 + MoveIt 配置 + 仿真), 源码
-├── docs/                   官方 PDF 手册 + 参数速查 + 真机部署指南
+├── docs/                   官方 PDF 手册 + 参数速查 + 真机部署 + Gazebo 显示层说明
 ├── setup/                  一键安装/打补丁/编译/启动脚本
 ├── verification/           仿真验证脚本 + 实测截图
 ├── dual_arm_demo/          双臂 operator/tracking 演示(基于本机械臂)
@@ -58,6 +58,26 @@ ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 vel_scale
 
 详见 `jaka_competition_kit/README.md`(仿真)与 `docs/真机部署.md`(决赛真机)。
 
+### 想用 Gazebo 出画面?
+
+加一个 `world:=gazebo` 就行 —— 会把真物理、**赛场镜像**、判分侧一起起起来:
+
+```bash
+ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 world:=gazebo
+```
+
+Gazebo 默认只有一个空世界(`empty.sdf`), 赛场几何是**不会**自动出现的
+(它只写在 MoveIt 规划场景里)。`gazebo_mirror.launch.py` 里的 `gz_scene`
+节点会把规划场景逐个镜像成 Gazebo 模型, 工件被夹住时也会跟着夹爪走。
+
+> ⚠️ **两条线的耗时差近一倍**, 见下表。**判分用哪条线, 限时就只能按哪条线标定** ——
+> 混用会把参考实现自己判成超时。
+>
+> ⚠️ 本机无 GPU, Gazebo 走 llvmpipe 软渲染, 运行时创建的几何会有竖条纹瑕疵;
+> 投大屏请用带独显的机器。
+
+细节、机位命令和踩过的坑: `docs/Gazebo仿真.md`。
+
 ### 限时怎么来的
 
 `rules.yaml` 的限时不是拍脑袋定的, 是拿参考实现实跑取中位数:
@@ -68,6 +88,10 @@ ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 vel_scale
 | 二(12 件) | 228.2 s | **320 s** | **230 s** |
 
 换机器/换机械臂/换固件都要重跑 `bash design/calibrate.sh <赛道> 3`。
+
+**这两组数字只对 RViz(假硬件)线成立。** 同一套参考实现在 Gazebo(真物理)
+线上跑赛道一要 209.4 s —— 因为假硬件模式轨迹是"瞬间到位", Gazebo 里关节
+得按真实速度走完、还要等物理收敛。所以限时**不能跨线复用**。
 
 启动仿真后另开终端验证一次规划+执行:
 
@@ -83,6 +107,8 @@ python3 verification/moveit_plan_exec.py 0.4,0.9,-1.1,0,1.0,0.6
 | URDF 运动学 vs TF | 4 个位姿误差 0.000 mm |
 | MoveIt RViz 仿真 | 规划+执行成功, error_code=1, 29 个轨迹点 |
 | Gazebo 物理仿真 | 规划+执行成功, error_code=1, 32 个轨迹点, Gazebo 关节收敛到目标 |
+| Gazebo 赛场镜像 | 赛道一整轮 6/6, 46 个实体(台面/工位板/料盒/二维码/6 工件)与规划场景一致 |
+| Gazebo 线限时 | 参考实现 209.4 s(真物理) vs 102.7 s(假硬件) —— 不能跨线复用 |
 
 细节和截图见 `verification/README.md`。
 

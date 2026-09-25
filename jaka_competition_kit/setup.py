@@ -28,6 +28,7 @@ setup(
             "ref_track2 = jaka_competition_kit.ref_track2:main",
             "arena_check = jaka_competition_kit.arena_check:main",
             "qr_tool = jaka_competition_kit.qr_tool:main",
+            "gz_scene = jaka_competition_kit.gz_scene:main",
         ],
     },
 )

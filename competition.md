@@ -50,7 +50,7 @@
 
 | 项目 | 初赛(仿真) | 决赛(真机) |
 |---|---|---|
-| 平台 | ROS 2 Humble + MoveIt 2 假硬件 / Gazebo | ROS 2 Humble + JAKA Mini 2 真机 |
+| 平台 | ROS 2 Humble + MoveIt 2 假硬件(判分线) | ROS 2 Humble + JAKA Mini 2 真机 |
 | 赛场定义 | `jaka_competition_kit/config/arena.yaml` | **同一份 `arena.yaml`** |
 | 题目生成 | 官方场景生成器随机生成 | 裁判按生成器输出摆放 |
 | 计时判分 | 自动计时 + 自动判分 | 自动计时 + 自动判分 + 裁判复核 |
@@ -58,6 +58,10 @@
 
 **一致性要求**:初赛与决赛使用**同一份 `arena.yaml`** 与**同一套评分程序**。
 仿真赛成绩与真机赛成绩可直接比较。
+
+> **判分只看 MoveIt 规划场景**(RViz 里那份), 它才是赛场几何的唯一真源。
+> Gazebo 是**可选显示层**(`round.launch.py world:=gazebo`), 用来出转播画面,
+> 不参与判分。详见 `docs/Gazebo仿真.md`。
 
 ### 0.4 编号规则
 
@@ -339,6 +343,11 @@
 
 > 上表是在**打开关节加速度限位**、`vel_scale=1.0`、MoveIt 假硬件 + RViz
 > (本仓库开发机,RViz 常驻占用约 1.3 核)下测得的。关掉 RViz 通常会更快。
+>
+> ⚠️ **这组限时只对假硬件(判分)线成立, 不能拿到 Gazebo 线上用。** 同一套
+> 参考实现在 Gazebo 真物理下跑赛道一要 209.4 秒(约 2 倍) —— 假硬件模式轨迹
+> 是"瞬间到位", Gazebo 里关节得按真实速度走完、还要等物理收敛。若要把判分
+> 搬到 Gazebo, 必须先用 `bash design/calibrate.sh` 在该线上重新标定。
 
 标定命令:
 

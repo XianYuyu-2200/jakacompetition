@@ -52,6 +52,39 @@ MoveGroup 目标 `error_code=1`,32 个轨迹点,Gazebo 侧 `/joint_states` 收�
 - `screenshots/05-gazebo-model-loaded.png` 执行前
 - `screenshots/06-gazebo-after-trajectory.png` 执行后
 
+### 三之二、赛场镜像进 Gazebo(新增)
+
+上面那一节里 Gazebo 是**空世界** —— 只有地面、太阳和机械臂, 看不到赛场。
+原因是工作台/工位板/料盒/工件只存在于 MoveIt 规划场景里, Gazebo 不认识。
+`gz_scene` 节点(`launch/gazebo_mirror.launch.py`)把规划场景轮询出来、逐个
+镜像成 Gazebo 模型。
+
+```bash
+ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 \
+    world:=gazebo run_reference:=false
+ros2 service call /competition/generate std_srvs/srv/Trigger "{}"
+ros2 run jaka_competition_kit ref_track1 --ros-args -p vel_scale:=0.5
+ros2 service call /competition/start std_srvs/srv/Trigger "{}"
+```
+
+实测:
+
+| 项目 | 结果 |
+|---|---|
+| Gazebo 实体数 | 46(地面/太阳/机械臂 + 台面 + 6 工位板 + 料盒 5 件 + 二维码 + 6 工件) |
+| 机械臂运动 | 真物理, `jaka_minicobo_controller` 每条轨迹 `Goal reached, success!` |
+| 抓取判分 | **6/6** 全部成功 |
+| 耗时 | **209.4 s** —— 对比假硬件线 102.7 s, 慢近一倍 |
+
+- `screenshots/08-gazebo-arena-mirrored.png` 场地已镜像进 Gazebo
+- `screenshots/09-gazebo-arena-running.png` 参考实现在 Gazebo 物理里执行中
+
+⚠️ 两个坑记在这里:
+
+1. 本机无 GPU, Gazebo 走 llvmpipe 软渲染, **运行时 spawn 的几何有竖条纹
+   瑕疵**(机械臂本体正常)。已排除抓图工具和阴影两个原因。有独显不会这样。
+2. Gazebo 线耗时 ≈ 假硬件线 × 2, **限时不能跨线复用**。
+
 ## 四、其他两个脚本
 
 `joint_pose_pub.py` — 手动摆姿态用,改 `/tmp/jaka_pose.json` 即可:

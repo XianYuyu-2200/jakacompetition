@@ -206,7 +206,11 @@ class SceneClient:
         """只摘**确实还挂在末端上**的那些工件。"""
         snap = self.snapshot_ids()
         if snap is None:
-            return self.detach_any(list(ids), links)
+            # 读不到场景 = move_group 还没起来 / 刚重启。此时它的场景必然是空的,
+            # 没有什么可摘的。**绝不能**退回 detach_any: 那会对每个链接 × 每个 id
+            # 都发一次 REMOVE, MoveIt 为每个不存在的物体刷一行
+            # "Attached body 'wp_7' not found", 一次出题几十行噪声。
+            return True
         _world, attached = snap
         todo = [i for i in ids if i in attached]
         return self.detach_any(todo, links) if todo else True

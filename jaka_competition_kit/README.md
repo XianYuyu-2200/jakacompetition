@@ -35,6 +35,32 @@ ros2 service call /competition/start    std_srvs/srv/Trigger "{}"
 > 工作台/工位板/料盒/工件。这个 launch 用工具包自带的
 > `config/competition.rviz`(相机已拉近到台面)。
 
+### 1.1 想直接跑在 Gazebo 里?
+
+```bash
+# 一条命令: 真物理 + 赛场镜像 + 判分侧
+ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 world:=gazebo
+```
+
+Gazebo 那条线默认是**空世界**, 赛场几何不会自己出现 —— 它在 MoveIt 规划
+场景里, Gazebo 不认识。`world:=gazebo` 会顺带起 `gazebo_mirror.launch.py`,
+把规划场景逐个镜像成 Gazebo 模型(工件夹起来时会跟着夹爪走)。
+
+单独补一个镜像(比如你已经在跑 `demo_gazebo.launch.py`):
+
+```bash
+ros2 launch jaka_competition_kit gazebo_mirror.launch.py
+```
+
+> ⚠️ **Gazebo 线比 RViz 线慢近一倍**(209.4 s vs 102.7 s, 赛道一),
+> 因为假硬件模式轨迹瞬间到位、Gazebo 要按真实速度走。
+> **判分用哪条线, 限时就得按哪条线重新标定**, 不能混用。
+>
+> ⚠️ 无独显的机器上 Gazebo 走 llvmpipe 软渲染, 运行时创建的几何会有
+> 竖条纹瑕疵; 投大屏请用带 GPU 的机器。
+>
+> 细节见 `docs/Gazebo仿真.md`。
+
 ---
 ## 2. 模块地图
 
@@ -49,6 +75,7 @@ ros2 service call /competition/start    std_srvs/srv/Trigger "{}"
 | `backend` | MoveIt 动作客户端。仿真/真机同一接口 |
 | `gripper` | 夹爪抽象(`MockGripper` / `JakaIOGripper`) |
 | `executor` | 抓取原语 + 事件上报(队伍直接用这个) |
+| `gz_scene` | 把 MoveIt 规划场景镜像进 Gazebo(可选显示层, 不参与判分) |
 | `scene_generator` | 出题节点 |
 | `scorer` | 自动计时判分节点 |
 | `ref_track1` / `ref_track2` | 官方参考实现 |
@@ -195,6 +222,22 @@ ros2 run jaka_competition_kit ref_track1 --ros-args -p debug_timing:=true
 12. **失败了要把工件放回原位, 不能凭空扔掉** —— 判分器只认"掉到台面"才罚分。
     一次规划失败就把工件塞进料盒(或删掉), 会让判罚口径失真。
     见 `scene.put_back()` + `Executor.recover()`, 它会补发一个 `abort` 事件。
+
+### 6.4 Gazebo 镜像(gz_scene)
+
+13. **不能用 `/monitored_planning_scene` 话题当数据源** —— 它是 VOLATILE 的,
+    晚启动的节点收不到已有场景, 实测表现是"镜像一个模型都不生成"。
+    改用 `/get_planning_scene` 服务轮询。
+14. **Gazebo 的 create/remove/set_pose 默认不是 ROS 服务** ——
+    要用 `ros_gz_bridge parameter_bridge` 显式桥接(launch 里已经做了)。
+15. **launch 参数别叫 `world`** —— `IncludeLaunchDescription` 会继承父级的
+    launch configuration, 而 `round.launch.py` 已经用 `world` 表示
+    "rviz/gazebo"。同名的话服务名会变成 `/world/gazebo/create`, 建不出模型。
+    所以镜像的参数叫 `gz_world`。
+16. **地面要自动挪** —— 赛场 `z=0` 是基座安装面, 台面顶面在 `z=-1mm`,
+    比 Gazebo 自带地面低, 不挪就只看得见地面。
+
+细节见 `docs/Gazebo仿真.md`。
 
 ---
 ## 7. 标定限时(换硬件必做)
