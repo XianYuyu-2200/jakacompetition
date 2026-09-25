@@ -136,10 +136,65 @@ bash setup/xorg-gpu.sh stop :0
 
 两个注意点:
 
-- `:0` 上**没有窗口管理器**, 新窗口不会自动置顶。用
-  `xdotool windowraise <wid>` 把 Gazebo 提到最前面再截图;
+- `:0` 上**没有窗口管理器**, 新窗口不会自动置顶。X 不保存被遮挡的像素,
+  `xwd` / `import -window` 抓到的是"屏幕上那块区域", 所以抓图前要先
+  `xdotool windowraise <wid>` 把它抬上来, 否则抓到的是盖在它上面的 RViz;
 - 反过来, `:1001` 上 Gazebo 的 Ogre 视口在这台机器上会**只画一帧就不重绘**
   (Qt 面板照常刷新, 3D 区冻住)。要拍 Gazebo 的画面, 用 `:0`。
+
+第二条 2026-09 用屏幕级抓帧量化确认过, 不是抓图工具的假象: 机械臂在动、
+`/joint_states` 在变的情况下, 直接抓 `:1001` 上 Gazebo 窗口的区域, 8 秒里
+只差 ~300 像素(同期 RViz 是 ~15000 像素, 转发窗口是 ~6200 像素)。换 Ogre1
+引擎(`--render-engine-gui ogre`)更糟 —— 在 `:1001` 上连窗口都开不出来。
+
+### 4.2.1 在远程桌面里看 `:0` 上的 Gazebo(两种办法)
+
+`:1001` 上 3D 区不重绘、`:0` 又不在 NoMachine 里 —— 先把 Gazebo 线起在 `:0`
+(GUI 和 server 都在 `:0`, 独显负责渲染):
+
+```bash
+bash setup/xorg-gpu.sh start :0
+DISPLAY=:0 ros2 launch jaka_competition_kit round.launch.py world:=gazebo \
+    track:=1 seed:=246135 vel_scale:=0.5 run_reference:=false
+
+# 出题 + 发令(DISPLAY 无所谓)
+ros2 service call /competition/generate std_srvs/srv/Trigger "{}"
+ros2 service call /competition/start    std_srvs/srv/Trigger "{}"
+```
+
+然后选一种把画面搬到你面前:
+
+**(A) VNC —— 能拖拽、能操作, 推荐**
+
+```bash
+bash setup/xorg-viewer.sh start      # 起 VNC 服务 + 打开查看窗口
+bash setup/xorg-viewer.sh stop       # 用完关掉
+```
+
+- 服务端只听 `127.0.0.1`(`-localhost`), 不对外开端口; 本地回环连接不需要密码;
+- 窗口里就是 `:0` 的桌面, 左键拖=转视角, 中键拖=平移, 滚轮=缩放;
+- 实测(x11vnc 0.9.16 + gvncviewer 1.3.0, 1920x1080): 两端各占 5~6% CPU,
+  画面流畅可交互; 拖拽转视角后 `:0` 侧的 Gazebo 画面确实跟着变;
+- 本机没装这两个包时脚本会自己 `apt-get download` 解到 `~/.local/opt/vnc` ——
+  **不需要 sudo**。想装进系统就 `sudo apt install x11vnc tigervnc-viewer`;
+- 踩过的坑: 本机环境里 `WAYLAND_DISPLAY=no`, x11vnc 会把它当成 Wayland 会话
+  直接 `Wayland display server detected. Exiting.` —— 脚本里用 `env -u` 去掉了。
+
+**(B) 只读转发 —— 不装任何东西**
+
+```bash
+python3 setup/gazebo-viewer.py --from :0 --title Gazebo --crop 578x797+0+48
+```
+
+- 每帧 `xwd` 抓一次贴到窗口里, 只读, 不动仿真、不进判分链路; 1000x845 的
+  Gazebo 窗口约 5 fps, 占用 10% CPU 左右;
+- 帧率 `--fps`, 大小 `--scale`, `--crop WxH+X+Y` 用来裁掉右侧属性面板;
+- 只依赖 `xwd`、`xdotool`、PIL、tkinter(这台机器都有, 不用装 ffmpeg);
+- 抓图前会把目标窗口置顶(`:0` 没有窗口管理器, 不置顶抓到的是盖在它上面的
+  RViz), 不想动叠放顺序加 `--no-raise`。
+
+两种办法都只是"看", 机位都还是用第 5 节那条 `ign service /gui/move_to/pose`
+调(`:0` 上的 GUI 一样吃)。
 
 ### 4.3 曾经被当成"软渲染瑕疵"的那层竖条纹
 

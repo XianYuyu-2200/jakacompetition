@@ -23,6 +23,19 @@ DISPLAY=:0 ros2 launch jaka_competition_kit round.launch.py world:=gazebo
 bash setup/xorg-gpu.sh stop :0
 ```
 
+`:0` 是 NoMachine 看不到的, 而 Gazebo 的 3D 区在 `:1001` 上不重绘。想在远程
+桌面里看/操作 Gazebo:
+
+```bash
+bash setup/xorg-viewer.sh start    # VNC: 可拖拽操作, 只监听本机, 免 sudo
+bash setup/xorg-viewer.sh stop
+
+# 或者只读转发(不装任何东西, 约 5 fps):
+python3 setup/gazebo-viewer.py --from :0 --title Gazebo --crop 578x797+0+48
+```
+
+细节见 `docs/Gazebo仿真.md` 第 4.2.1 节。
+
 ## 为什么必须有第 2 步
 
 仓库里的 `jaka_ros2/src/jaka_minicobo_moveit_config/launch/demo.launch.py`
