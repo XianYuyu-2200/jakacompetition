@@ -4,6 +4,19 @@ import os
 
 package_name = "jaka_competition_kit"
 
+
+def _data(pattern):
+    """挑 data_files 用的文件, 跳过运行时生成的 ``__pycache__``。
+
+    launch 目录里的 .py 一旦被跑过, Python 就会在旁边生成 ``launch/__pycache__``。
+    裸 ``glob("launch/*")`` 会把它当数据一起收进去, 而 colcon --symlink-install
+    随后会试着把"目录"当文件链接到 install, 直接报
+    ``can't copy ... launch/__pycache__: doesn't exist or not a regular file``,
+    整个包编译失败 —— 只在"跑过仿真之后再 build"时复现, 很容易踩。
+    """
+    return [p for p in glob(pattern) if os.path.isfile(p)]
+
+
 setup(
     name=package_name,
     version="0.1.0",
@@ -11,8 +24,8 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resources/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        (os.path.join("share", package_name, "config"), glob("config/*")),
-        (os.path.join("share", package_name, "launch"), glob("launch/*")),
+        (os.path.join("share", package_name, "config"), _data("config/*")),
+        (os.path.join("share", package_name, "launch"), _data("launch/*")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
