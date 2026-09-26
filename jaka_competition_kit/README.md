@@ -74,7 +74,7 @@ ros2 launch jaka_competition_kit gazebo_mirror.launch.py
 | `qr` | 二维码生成 / 解析(`JAKA1-######`) |
 | `scene` | 规划场景操作(摆台面/料盒/工件, 附着/释放) |
 | `backend` | MoveIt 动作客户端。仿真/真机同一接口 |
-| `gripper` | 夹爪抽象(`MockGripper` / `JakaIOGripper`) |
+| `gripper` | 夹爪抽象:`SimGripper`(仿真, 发 `/gripper_controller/commands`) / `WheeltecGripper`(真机串口) / `MockGripper` / `JakaIOGripper` |
 | `executor` | 抓取原语 + 事件上报(队伍直接用这个) |
 | `gz_scene` | 把 MoveIt 规划场景镜像进 Gazebo(可选显示层, 不参与判分) |
 | `scene_generator` | 出题节点 |
@@ -84,9 +84,26 @@ ros2 launch jaka_competition_kit gazebo_mirror.launch.py
 命令行工具:
 
 ```bash
-ros2 run jaka_competition_kit arena_check   # 改完 arena.yaml 必须跑
+ros2 run jaka_competition_kit arena_check   # 改完 arena.yaml 必须跑(含末端可达性逐点校核)
 ros2 run jaka_competition_kit qr_tool       # 手动生成/解码二维码
 ```
+
+### 2.1 末端执行器怎么切
+
+默认是**裸法兰 / 行程几十毫米的小平行夹爪**(规则书写的就是它,
+`arena.yaml` 的 `tool.gripper: none`)。要挂 WHEELTEC MS42DC 二指柔性爪:
+
+```bash
+JAKA_GRIPPER=1 ros2 launch jaka_competition_kit round.launch.py world:=gazebo track:=1
+```
+
+一个环境变量同时切 URDF 模型、抓取高度和夹爪控制器(三处必须一致,
+拆开改就会出现"URDF 有夹爪、高度按法兰算"这种把手指戳进台面的组合)。
+自备夹爪只要实现 `Gripper.open()/close(object_size)` 就能接入。
+
+> ⚠ 柔性爪的指尖深度是 204.6mm,抓取高度会从 100mm 抬到 213.6mm,
+> 而 580mm 臂展在 r=385mm 处的工具朝下可达上限只有 195.9mm ——
+> **工位 4/6 抓不到**。数字与可选方案见 `docs/WHEELTEC柔性机械爪.md` 第 4 节。
 
 ---
 ## 3. 接口约定
@@ -205,38 +222,124 @@ ros2 run jaka_competition_kit ref_track1 --ros-args -p debug_timing:=true
 9. **料盒不能做小** —— 150×100 的内腔(130×80)装不下 6 件 50mm 工件
    (10400mm² vs 15000mm²), 而且侧墙只剩 15mm 余量, 规划器末段一甩就
    报 `Computed path is not valid`。现为 **200×150**。
+10. **换末端要连"抓取高度"一起换** —— 工件顶面离 TCP 多远, 由
+   `Arena.grasp_offset(object_size)` 算: 裸法兰是 `flange_height + clearance`
+   (46mm), 柔性爪是 `tip_depth + tip_clearance − 工件尺寸`(50mm 件 = 159.6mm)。
+   两者差 **114mm**。只换 URDF 不改这里, 手指会直接扎进台面。
+11. **末端越长, 够得到的半径越小** —— 工具轴朝下时 `J5` 恒在 TCP 正上方
+   `wrist_len`(=URDF 里 J5→法兰的 159.3mm), 而 `J5` 被"大臂+小臂 420.5mm"
+   的球锁住, 所以 `z_max(r) = 27.7 + √(420.5² − r²)` mm(实测完全吻合)。
+   MoveIt 对"撞了"和"到不了"都只回 `error_code=99999`, 分不出来 ——
+   用 `Arena.max_tcp_z()` / `arena_check` 直接算, 别靠试。
 
 ### 6.3 让它跑得快
 
-10. **竖直进/出要走笛卡尔直线, 不要用 RRTConnect** —— RRTConnect 返回的是
+12. **竖直进/出要走笛卡尔直线, 不要用 RRTConnect** —— RRTConnect 返回的是
     关节空间随机路径, 末端中途会甩。抓取/投放本来就是"竖直进、竖直出",
     见 `MoveGroupBackend.goto_xyz_straight()`(`/compute_cartesian_path`
     + `/execute_trajectory`), 分数 <0.95 时自动退回 RRTConnect。
-    探路/转场(approach、to_bin)仍走关节空间。
-    **实测单次运动 0.3–0.6s, 而关节空间要 2.5–6s。**
-11. **`joint_limits.yaml` 要打开加速度限位** —— 仓库默认
+    `pick_and_place` 的**下降/抬起/投放/退出**都走直线(下降和抬起是对称的,
+    别只改一半); 关节空间下降在手腕奇异附近会划一道弧线, 工件容易蹭到邻居。
+    探路/转场(approach、to_bin)走关节空间, 但目标必须是"最近 IK 解"(见下条),
+    否则照样甩。
+    **实测直线 0.4–0.7s; 关节空间转场 0.6–4.7s(看距离)。**
+13. **位姿目标会让规划器"随机换关节解"** —— 只给末端位姿(5mm 球 + 姿态容差)时,
+    同一个位姿对应多组关节解(肘上/肘下、手腕翻转, 以及 J1/J4/J6 绕 ±360° 的
+    等效解), OMPL 采样到哪组**是随机的**。实测同一个"末端下移 10mm"的动作,
+    规划出来的轨迹单关节行程高达 **538°**(J1 绕了整整一圈), 而正确答案只有 2.3°。
+    见 `MoveGroupBackend.nearest_ik()`: 先解 IK, 按"单关节最大行程"挑最近的一组解,
+    再把目标写成 `JointConstraint`; 解不出来或关节目标规划失败才退回位姿目标。
+
+    a. **IK 求解器要用 LMA, 不能用 KDL** —— 见
+       `jaka_minicobo_moveit_config/config/kinematics.yaml`。KDL 是牛顿迭代,
+       本臂 J5 接近 ±90°(手腕奇异)时从给定种子经常不收敛, 插件随即改用
+       **随机种子重启**: 实测同一个目标、同一个 seed 连续 10 次分别解出
+       96°/154°/180° 三支, 还有 5 次直接"解不出"。这就是
+       **"有几次抓取没走最优轨迹"的根因**。换成
+       `lma_kinematics_plugin/LMAKinematicsPlugin`(阻尼最小二乘)后, 同目标
+       同 seed 连续 10 次**完全一致**; `timeout` 也从 5ms 放宽到 50ms。
+       **改完必须重启 `move_group`** —— 插件只在启动时加载。
+    b. **种子要铺满各分支** —— 6R 臂同一个末端位姿一般有 8 组解(肩 ±180°、
+       肘上/肘下、手腕翻转 = `J4+180° / J5 取反 / J6+180°`)。数值 IK 只收敛到
+       种子附近那一支, 所以 `_ik_seeds()` 按这个结构生成 4~8 个种子各解一次,
+       `ik_candidates()` 按行程从小到大**排序返回全部解**。实测 **182 组**
+       (14 个真实可达位形 × 13 个抓取目标)全部取到全局最优(与 96 次随机种子的
+       暴力枚举结果一致), 单次约 20ms。
+       *注意*: 只枚举"当前角 ±360° 的等效表示 + 零位"是不够的 —— 当前角本身就是
+       零位时这两者重合, 等于没枚举(实测 wp_5 会稳定地选到 180° 而不是 91°)。
+    c. **避障解优先** —— `avoid_collisions=False` 才解出来的位形本身就在碰撞里,
+       拿它当目标规划必然失败, 只能当兜底。
+    d. **规划失败要换下一支解, 不要退回位姿目标** —— 最优的那一支解可能因为
+       臂杆和场景碰撞而规划不出来(终点位姿本身没问题: 工件挂在末端, 换哪一支
+       工件都在同一处, 但臂杆位置不同)。`goto()` 会按行程顺序最多试
+       `max_ik_tries`(默认 3)支解, 只有全部失败才退回位姿目标。
+       实测赛道二有两处 `to_bin` 因为少了这一步退化到位姿目标, 每处白跑
+       10~12s, 而且关节解是随机的。备选解用 `quick` 预算(1 次尝试 / 1s),
+       最坏耗时可控。
+       **再加一层"放宽容差"**: 实测失败是**秒回 `-2`**(不是规划超时), 说明是
+       目标位形被判非法、而不是规划不出来。这时把同一个关节目标的容差从
+       1 mrad 放到 `joint_tol_loose`(0.02 rad ≈ 1.15°, 臂展 0.3m 上约 4~6mm,
+       和位姿目标自带的 5mm 球同量级)**保留选定分支**再试一次。
+       加了这一层之后赛道二的位姿兜底从每轮 1~2 次降到 **0 次**, 单轮
+       159.9s → 128.0s。
+    e. 把 IK 解绕回离当前角最近的那一圈(限位从 `/robot_description` 解析),
+       否则 -180°/+180° 这类等价表示也会变成绕整圈。
+    f. **转场先试笛卡尔直线(LIN), 再 PTP, 最后 OMPL** —— 竖直进/出、投放、
+       退出用 `goto_xyz_straight()`; 工位 <-> 料盒的长转场也先试 LIN(见第 14 条:
+       抬够高度后 LIN 全部走得通, 又直又短)。LIN 不行再交给
+       `pilz_industrial_motion_planner` 的 `PTP`(各关节同步走关节空间直线 +
+       梯形速度曲线, 工业现场搬运动作的标准做法, **确定性**), 规划只要 ~10ms;
+       还不行才是 OMPL。
+    **实测 Gazebo 线 173.2s → 52.1s, 6/6 与判分结果不变。**
+14. **`joint_limits.yaml` 要打开加速度限位** —— 仓库默认
     `has_acceleration_limits: false` + 默认缩放 0.1。加速度限位缺失时
     `vel=1.0/acc=1.0` 反而比 `vel=1.0/acc=0.3` **更慢**(时间倒挂)。
     改成 `has_acceleration_limits: true / max_acceleration: 3.14`,
     默认缩放改 1.0。**改完必须重启 `demo.launch.py`** ——
     `move_group` 只在启动时读这个文件。
-12. **失败了要把工件放回原位, 不能凭空扔掉** —— 判分器只认"掉到台面"才罚分。
+15. **失败了要把工件放回原位, 不能凭空扔掉** —— 判分器只认"掉到台面"才罚分。
     一次规划失败就把工件塞进料盒(或删掉), 会让判罚口径失真。
     见 `scene.put_back()` + `Executor.recover()`, 它会补发一个 `abort` 事件。
+16. **抬着工件转场要"显式抬够", 否则反而抬得更高** —— 不看数据很难想到。
+    工件挂在 TCP 下方 `grasp_offset + size` 处, 所以**转场高度**必须让工件的
+    **底面**越过料盒侧墙和旁边工件的顶面:
+    `tz = 障碍顶面 + 间隙 + grasp_offset + size`(见 `Arena.transfer_tcp_z()`)。
+    - 原来 `lift`/`to_bin` 直接复用了"预抓取悬停高度"(抓取点 +35mm): 赛道一
+      手里工件的底面只有 39mm, 而旁边工件顶面 52mm、料盒侧墙 39mm —— 必然撞。
+      PTP 走不通, 退回 OMPL 就绕出一条**往外甩、往上拱**的大弧: 实测末端从
+      135mm 拱到 **354mm**、半径甩到 **461mm**(超出 420mm 作业带)。看上去就是
+      "机械臂抬得很高、不是最优轨迹"。
+    - 显式抬到 159mm(赛道一) / 190~230mm(赛道二, 料盒侧墙 100mm)之后, 直线
+      转场全部走通: **峰值高度 354mm → 160mm**, 赛道二 `to_bin` 合计
+      **68.9s → 35.1s**, 单轮 128.0s → 122.4s。**"抬够" 与 "抬得高" 是反的:
+      抬不够才真的抬得高。**
+    - **`approach_lift`(预抓取悬停高度)和转场高度是两件事, 不要混用**: 前者
+      贴着工件越好(现为 35mm), 后者按障碍物算。
+    - 间隙可在 `arena.yaml` 的 `tool.transfer_margin` 里调(默认 10mm)。
 
 ### 6.4 Gazebo 镜像(gz_scene)
 
-13. **不能用 `/monitored_planning_scene` 话题当数据源** —— 它是 VOLATILE 的,
+17. **不能用 `/monitored_planning_scene` 话题当数据源** —— 它是 VOLATILE 的,
     晚启动的节点收不到已有场景, 实测表现是"镜像一个模型都不生成"。
     改用 `/get_planning_scene` 服务轮询。
-14. **Gazebo 的 create/remove/set_pose 默认不是 ROS 服务** ——
+18. **Gazebo 的 create/remove/set_pose 默认不是 ROS 服务** ——
     要用 `ros_gz_bridge parameter_bridge` 显式桥接(launch 里已经做了)。
-15. **launch 参数别叫 `world`** —— `IncludeLaunchDescription` 会继承父级的
+19. **launch 参数别叫 `world`** —— `IncludeLaunchDescription` 会继承父级的
     launch configuration, 而 `round.launch.py` 已经用 `world` 表示
     "rviz/gazebo"。同名的话服务名会变成 `/world/gazebo/create`, 建不出模型。
     所以镜像的参数叫 `gz_world`。
-16. **地面要自动挪** —— 赛场 `z=0` 是基座安装面, 台面顶面在 `z=-1mm`,
+20. **地面要自动挪** —— 赛场 `z=0` 是基座安装面, 台面顶面在 `z=-1mm`,
     比 Gazebo 自带地面低, 不挪就只看得见地面。
+21. **重起仿真是"按进程名杀干净 + 清 `/dev/shm`"两件事** ——
+    只 `pkill -f round.launch.py` 会留下**孤儿的** `scorer` /
+    `scene_generator` / `move_group` / `ign gazebo`。症状很好认但很迷惑:
+    多发令一次、状态又自己跳回 `armed`(旧 scorer 在发状态)、
+    `/competition/scene` 里少了字段(旧 generator 在发题)、
+    或者 `approach` 跑了 100 多秒、`取不到 world -> dummy_tcp 的 TF`。
+    杀进程时要用 `[x]xx` 这种写法避免 pkill 命中自己所在的命令行, 并且
+    **不要在同一个 shell 里又写 `ros2 launch ...` 又 `pkill -f round.launch`**;
+    杀完再 `find /dev/shm -maxdepth 1 \( -name 'fastrtps*' -o -name 'sem.fastrtps*' \) -delete`,
+    否则新进程会 `Failed init_port ... open_and_lock_file failed`、TF 丢包。
 
 细节见 `docs/Gazebo仿真.md`。
 

@@ -120,6 +120,12 @@ python3 verification/moveit_plan_exec.py 0.4,0.9,-1.1,0,1.0,0.6
 `ref_track1` / `ref_track2` 是官方参考实现(也是限时标定基准)。
 初赛(仿真)与决赛(真机)用**同一份配置、同一套判分**。
 
+**WHEELTEC 柔性机械爪/** — 这只夹爪的厂商原始资料(手册/固件源码/上位机/三维模型,
+约 547MB,大二进制由该目录的 `.gitignore` 排除)。**怎么用看
+`docs/WHEELTEC柔性机械爪.md`**。被项目抽走的部分:
+`jaka_ros2/src/wheeltec_gripper/`(STEP→STL 转换 + URDF 宏 + 实测几何)、
+`jaka_ros2/src/step_motor/` 与 `jaka_ros2/src/serial_ros2/`(厂商 ROS 2 串口驱动)。
+
 **design/** — 设计比赛本身要用的东西。`规则校核报告.md` 逐条列出
 `competition.md` 里的错误与实测依据;`赛事设计指南.md` 是怎么把两个比赛落地的路线;
 `arena_layout.png` / `reach_envelope.png` 可直接用作赛题细则配图;
@@ -175,6 +181,11 @@ operator(192.168.0.101)/ tracking(192.168.0.102)只读跟随实验代码。
 - **赛场尺寸有硬约束**:工具竖直向下时,竖直抓取可达带是**距基座 180–420mm**。
   改任何尺寸后必须跑 `ros2 run jaka_competition_kit arena_check`。
   详见 `design/规则校核报告.md`。
+- **末端多长,直接决定够得到哪里**:规则书要的是行程 0–30mm 的小平行夹爪,所以
+  默认 `tool.gripper: none`。挂上 WHEELTEC 柔性爪(指尖深度 204.6mm)后抓取
+  高度抬 114mm,`z_max(r) = 27.7 + √(420.5² − r²)` mm —— **工位 4/6(r=385mm)
+  与料盒中心(r=363mm)会超出可达范围**,`arena_check` 会逐点报出来。
+  用法与四个可选方案见 `docs/WHEELTEC柔性机械爪.md`。
 
 - URDF 里**没有负载参数**。抓取类任务需要自己在规划场景里加
   (`AttachedCollisionObject` 或 SRDF 里配置)。Mini 2 的实际负载上限是 2 kg。

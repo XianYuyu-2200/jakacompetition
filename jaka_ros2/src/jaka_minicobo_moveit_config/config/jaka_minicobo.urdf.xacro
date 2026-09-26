@@ -3,15 +3,29 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="use_gazebo" default="false"/>
     <xacro:arg name="use_rviz_sim" default="false"/>
+    <!-- 末端夹爪: 默认**不装**(比赛规则书要求的是行程 0-30mm 的电动平行夹爪,
+         和裸法兰差不多长)。要挂 WHEELTEC MS42DC 二指柔性机械爪时(见
+         wheeltec_gripper 包), 设环境变量 JAKA_GRIPPER=1 —— arena.yaml 里的
+         tool.gripper 读的是同一个变量(jaka_competition_kit/arena.py), 所以
+         抓取高度会和 URDF 一起切过去, 不会出现"URDF 有夹爪、高度按法兰算"
+         这种把手指戳进台面的组合。
+         也可以显式传: xacro ... with_gripper:=true -->
+    <xacro:arg name="with_gripper" default="$(optenv JAKA_GRIPPER 0)"/>
 
     <!-- Import jaka_minicobo urdf file -->
     <xacro:include filename="$(find jaka_description)/urdf/jaka_minicobo.urdf" />
+
+    <!-- 末端夹爪(装在 dummy_tcp 上) -->
+    <xacro:include filename="$(find wheeltec_gripper)/urdf/wheeltec_gripper.urdf.xacro" />
+    <xacro:if value="$(arg with_gripper)">
+        <xacro:wheeltec_gripper prefix="" parent="dummy_tcp"/>
+    </xacro:if>
 
     <!-- Import control_xacro -->
     <xacro:include filename="jaka_minicobo.ros2_control.xacro" />
 
 
     <!-- <xacro:jaka_minicobo_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/> -->
-    <xacro:jaka_minicobo_ros2_control name="jaka_minicobo_hardware" initial_positions_file="$(arg initial_positions_file)" use_gazebo="$(arg use_gazebo)" use_rviz_sim="$(arg use_rviz_sim)" />
+    <xacro:jaka_minicobo_ros2_control name="jaka_minicobo_hardware" initial_positions_file="$(arg initial_positions_file)" use_gazebo="$(arg use_gazebo)" use_rviz_sim="$(arg use_rviz_sim)" with_gripper="$(arg with_gripper)" />
 
 </robot>

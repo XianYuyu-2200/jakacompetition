@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<!--
+  WHEELTEC MS42DC 电动二指柔性机械爪 —— 装到 JAKA Mini 2 / MiniCobo 的末端。
+
+  用法(在机械臂的 xacro 里):
+      <xacro:include filename="$(find wheeltec_gripper)/urdf/wheeltec_gripper.urdf.xacro"/>
+      <xacro:wheeltec_gripper prefix="" parent="dummy_tcp"/>
+
+  坐标: 所有网格都画在 **dummy_tcp** 坐标系里(-z 是工具轴, 也就是"往下夹"),
+  底座 link 与 dummy_tcp 原点重合; 两个手指 link 的原点在各自指根转轴上。
+
+  几何全部来自 config/gripper.yaml(由 step/gripper.STEP 实测, 见 tools/step_to_mesh.py):
+    指尖深度 204.6mm —— 这是本夹爪最要紧的一个数: 刀片比工件高得多, 工件是**夹在
+    两片指之间**的, 所以抓取时 TCP 要抬到"工件顶面 + 指尖深度 - 工件高度"那么高,
+    刀尖才刚好停在工件底面的上方(见 jaka_competition_kit 的 Arena.grasp_offset)。
+    指根转轴 ±35.9mm, 绕 +y 转 = 张合, 0° 是模型原状(张开), 最大 37.3°(指尖并拢)。
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="gripper_cfg"
+                  value="${xacro.load_yaml('$(find wheeltec_gripper)/config/gripper.yaml')}"/>
+  <xacro:property name="gripper_pivot" value="${gripper_cfg['pivot']}"/>
+  <xacro:property name="gripper_mass_base" value="${gripper_cfg['inertia'][0]['mass']}"/>
+  <xacro:property name="gripper_mass_jaw" value="${gripper_cfg['inertia'][1]['mass']}"/>
+  <xacro:property name="gripper_jaw_limit"
+                  value="${gripper_cfg['jaw_limit_deg'] * pi / 180.0}"/>
+  <!-- 指的质量集中在刀片中部, 惯量按凸包算(见 step_to_mesh.py) -->
+  <xacro:property name="gripper_jaw_i" value="${gripper_cfg['inertia'][1]}"/>
+
+  <xacro:macro name="wheeltec_gripper" params="prefix parent">
+
+    <!-- ============ 底座: 法兰转接板 + 步进电机 + 固定机架 ============ -->
+    <link name="${prefix}gripper_base">
+      <inertial>
+        <origin xyz="${gripper_cfg['inertia'][0]['origin'][0]} ${gripper_cfg['inertia'][0]['origin'][1]} ${gripper_cfg['inertia'][0]['origin'][2]}"
+                rpy="0 0 0"/>
+        <mass value="${gripper_mass_base}"/>
+        <inertia ixx="${gripper_cfg['inertia'][0]['ixx']}"
+                 ixy="${gripper_cfg['inertia'][0]['ixy']}"
+                 ixz="${gripper_cfg['inertia'][0]['ixz']}"
+                 iyy="${gripper_cfg['inertia'][0]['iyy']}"
+                 iyz="${gripper_cfg['inertia'][0]['iyz']}"
+                 izz="${gripper_cfg['inertia'][0]['izz']}"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://wheeltec_gripper/meshes/gripper_base.stl"/>
+        </geometry>
+        <material name="gripper_dark"><color rgba="0.28 0.28 0.30 1.0"/></material>
+      </visual>
+      <!-- 碰撞体是"整个底座一个包络盒"(12 个面): 底座最低点离 TCP 123.5mm,
+           永远在被抓工件上方, 不需要精确外形; 手指才需要(见下面) -->
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://wheeltec_gripper/meshes/gripper_base_col.stl"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${prefix}gripper_base_joint" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}gripper_base"/>
+    </joint>
+
+    <!-- ============ 两片柔性指 ============ -->
+    <!--
+      两个关节都用"正角度 = 闭合"的约定: +x 侧的指绕 +y 转, -x 侧的指绕 -y 转,
+      所以下发同一个正角度就能对称闭合, 控制器里不用再区分左右。
+    -->
+    <xacro:macro name="wheeltec_gripper_jaw" params="prefix side sign">
+      <link name="${prefix}gripper_jaw_${side}">
+        <inertial>
+          <!-- 指 link 的原点在转轴上, 所以质心要减掉转轴坐标 -->
+          <origin xyz="${sign * (gripper_jaw_i['origin'][0] - gripper_pivot[0])} ${gripper_jaw_i['origin'][1]} ${gripper_jaw_i['origin'][2] - gripper_pivot[2]}"
+                  rpy="0 0 0"/>
+          <mass value="${gripper_mass_jaw}"/>
+          <inertia ixx="${gripper_jaw_i['ixx']}"
+                   ixy="${gripper_jaw_i['ixy']}"
+                   ixz="${sign * gripper_jaw_i['ixz']}"
+                   iyy="${gripper_jaw_i['iyy']}"
+                   iyz="${gripper_jaw_i['iyz']}"
+                   izz="${gripper_jaw_i['izz']}"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://wheeltec_gripper/meshes/gripper_jaw_${side}.stl"/>
+          </geometry>
+          <material name="gripper_finger"><color rgba="0.85 0.25 0.20 1.0"/></material>
+        </visual>
+        <!-- 碰撞体是沿深度切成的 5 个盒子(60 个面), 保留了刀片"往下往外张开"
+             的锥度 —— 用完整网格(4868 面)会让每次规划多花几倍时间, 用一个大
+             盒子又会让规划误判"指尖已经碰到工件" -->
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://wheeltec_gripper/meshes/gripper_jaw_${side}_col.stl"/>
+          </geometry>
+        </collision>
+      </link>
+
+      <joint name="${prefix}gripper_jaw_${side}_joint" type="revolute">
+        <origin xyz="${sign * gripper_pivot[0]} ${gripper_pivot[1]} ${gripper_pivot[2]}"
+                rpy="0 0 0"/>
+        <parent link="${prefix}gripper_base"/>
+        <child link="${prefix}gripper_jaw_${side}"/>
+        <axis xyz="0 ${sign} 0"/>
+        <limit lower="0.0" upper="${gripper_jaw_limit}" effort="5.0" velocity="3.0"/>
+        <!-- 真机是一根 42 步进电机 + 螺杆驱动, 没有弹簧回位: 掉电就停在原地 -->
+        <dynamics damping="0.05" friction="0.02"/>
+      </joint>
+    </xacro:macro>
+
+    <xacro:wheeltec_gripper_jaw prefix="${prefix}" side="l" sign="1"/>
+    <xacro:wheeltec_gripper_jaw prefix="${prefix}" side="r" sign="-1"/>
+
+    <!-- Gazebo 里的颜色(URDF 的 <material> 只在 RViz 生效) -->
+    <gazebo reference="${prefix}gripper_base">
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
+    <gazebo reference="${prefix}gripper_jaw_l">
+      <material>Gazebo/Red</material>
+    </gazebo>
+    <gazebo reference="${prefix}gripper_jaw_r">
+      <material>Gazebo/Red</material>
+    </gazebo>
+  </xacro:macro>
+</robot>

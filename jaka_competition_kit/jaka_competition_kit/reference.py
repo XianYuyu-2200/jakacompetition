@@ -34,7 +34,9 @@ class ReferenceBase(rclpy.node.Node):
         self.declare_parameter("arena_config", "")
         self.declare_parameter("vel_scale", 0.5)
         self.declare_parameter("verify_only", False)
-        self.declare_parameter("gripper", "mock")
+        # 默认 sim: 仿真的 fingers 会张开/闭合(走 /gripper_controller/commands);
+        # 真机用 wheeltec(串口) / jaka_io(工具端 IO) / mock(不驱动)
+        self.declare_parameter("gripper", "sim")
         self.declare_parameter("debug_timing", False)
 
         self.arena = load_arena(str(self.get_parameter("arena_config").value) or None)
@@ -52,7 +54,8 @@ class ReferenceBase(rclpy.node.Node):
             vel_scale=vel, acc_scale=vel,
             planning_attempts=2, allowed_planning_time=2.0)
         self.scene_cli = SceneClient()
-        self.gripper = make_gripper(self.get_parameter("gripper").value, self)
+        self.gripper = make_gripper(self.get_parameter("gripper").value, self,
+                                    arena=self.arena)
         self.arm = Executor(self, self.arena, self.backend, self.scene_cli, self.gripper,
                             timing_log=bool(self.get_parameter("debug_timing").value))
         self.done = False

@@ -18,15 +18,28 @@
   team, round   写进成绩单的队伍名与轮次名
   run_reference 是否顺带起官方参考实现(默认 true; 队伍比赛时应设 false)
   vel_scale     参考实现的速度缩放
-  gripper       mock(仿真) / jaka_io(真机)
+  gripper       夹爪驱动: sim(仿真, 走 gripper_controller) / wheeltec(真机串口)
+                / mock(不动夹爪) / jaka_io(老的真机 IO 夹爪)
+  use_gripper   是否起夹爪控制器(默认跟着 JAKA_GRIPPER 环境变量走)
+
+末端换 WHEELTEC 柔性夹爪(默认是规则书要求的裸法兰/小平行夹爪):
+
+  JAKA_GRIPPER=1 ros2 launch jaka_competition_kit round.launch.py \
+      world:=gazebo track:=1
+
+这一个环境变量同时切三处: URDF 里的夹爪模型(with_gripper)、arena.yaml 的
+抓取/转场/投放高度(tool.gripper)、夹爪控制器(use_gripper)。**但注意**:
+JAKA 580mm 臂展 + 204.6mm 长的手指, 工位4/6 与料盒中心会超出可达范围
+(逐点数字见 `ros2 run jaka_competition_kit arena_check` 和
+docs/WHEELTEC柔性机械爪.md 第 4 节)。
 """
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
                             OpaqueFunction)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import (LaunchConfiguration, PathJoinSubstitution,
-                                  PythonExpression)
+from launch.substitutions import (EnvironmentVariable, LaunchConfiguration,
+                                  PathJoinSubstitution, PythonExpression)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -91,7 +104,26 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("run_reference")),
     )
 
+    # 夹爪两片指由独立的 gripper_controller 驱动(位置控制)。
+    # MoveIt 只执行机械臂的轨迹, 不会去启动这个控制器, 所以在这里 spawn。
+    gripper_ctl = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["gripper_controller", "--controller-manager-timeout", "60"],
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("use_gripper")),
+    )
+
     return LaunchDescription([
+        # 默认"装不装夹爪"跟着 JAKA_GRIPPER 走, 显式传 use_gripper:=... 可覆盖。
+        # 用 PythonExpression 求出字面量 true/false —— IfCondition 只认
+        # true/1/false/0, 直接写 $(optenv ...) 会报 invalid condition expression。
+        DeclareLaunchArgument(
+            "use_gripper",
+            default_value=PythonExpression([
+                "'true' if '", EnvironmentVariable("JAKA_GRIPPER", default_value="0"),
+                "'.strip().lower() in ('1', 'true', 'yes', 'on') else 'false'"]),
+            description="是否起夹爪控制器(末端装了 WHEELTEC 夹爪就跟着 JAKA_GRIPPER)"),
         DeclareLaunchArgument("world", default_value="rviz",
                               description="rviz=假硬件 / gazebo=真物理+赛场镜像"),
         DeclareLaunchArgument("track", default_value="1"),
@@ -100,6 +132,6 @@ def generate_launch_description():
         DeclareLaunchArgument("round", default_value="R1"),
         DeclareLaunchArgument("run_reference", default_value="true"),
         DeclareLaunchArgument("vel_scale", default_value="0.5"),
-        DeclareLaunchArgument("gripper", default_value="mock"),
-        sim, judge, reference,
+        DeclareLaunchArgument("gripper", default_value="sim"),
+        sim, gripper_ctl, judge, reference,
     ])

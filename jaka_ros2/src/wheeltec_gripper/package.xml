@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>wheeltec_gripper</name>
+  <version>1.0.0</version>
+  <description>
+    WHEELTEC MS42DC 二指柔性机械爪的机械臂末端集成:
+    由 step/gripper.STEP 转出的网格 + URDF 宏 + 实测几何参数(法兰以下总高
+    164.6mm, 指尖深度 204.6mm, 张开净距 76mm, 可夹 29-76mm)。
+    装在 jaka_minicobo 的 dummy_tcp(法兰) 上, 用两个转动关节张合。
+    真机控制用 step_motor 包(同工作空间), 仿真用 ros2_control 的 gripper_controller。
+    用法与可达性限制见 docs/WHEELTEC柔性机械爪.md。
+  </description>
+  <maintainer email="ktz@todo.todo">ktz</maintainer>
+  <license>Proprietary</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <!-- Gazebo(Ignition) 不认 package://, 转成 model://<包名>/... 之后按"资源路径"
+         找目录。ros_gz_sim 只会把声明了这条导出的包的 share 上级加进
+         GZ_SIM_RESOURCE_PATH —— jaka_description 也是这么干的。不声明的话网格
+         (含碰撞体)全部加载失败: 仿真里夹爪是隐形的, 而且**没有碰撞体**。 -->
+    <gazebo_ros gazebo_model_path="${prefix}/.."/>
+  </export>
+</package>

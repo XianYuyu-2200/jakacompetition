@@ -50,4 +50,18 @@
     <disable_collisions link1="Link_4" link2="Link_5" reason="Adjacent"/>
     <disable_collisions link1="Link_4" link2="Link_6" reason="Never"/>
     <disable_collisions link1="Link_5" link2="Link_6" reason="Adjacent"/>
+    <!-- ===== 末端夹爪 WHEELTEC 二指柔性爪 (wheeltec_gripper 包) =====
+         夹爪与手腕是刚性连接, 手指根又插在底座的机架里(底座碰撞体是个包络盒),
+         不显式关掉的话每一对都会一直报碰撞, 规划直接失败。 -->
+    <disable_collisions link1="Link_6" link2="gripper_base" reason="Adjacent"/>
+    <disable_collisions link1="Link_5" link2="gripper_base" reason="Never"/>
+    <disable_collisions link1="Link_4" link2="gripper_base" reason="Never"/>
+    <disable_collisions link1="Link_6" link2="gripper_jaw_l" reason="Never"/>
+    <disable_collisions link1="Link_6" link2="gripper_jaw_r" reason="Never"/>
+    <disable_collisions link1="Link_5" link2="gripper_jaw_l" reason="Never"/>
+    <disable_collisions link1="Link_5" link2="gripper_jaw_r" reason="Never"/>
+    <disable_collisions link1="Link_4" link2="gripper_jaw_l" reason="Never"/>
+    <disable_collisions link1="Link_4" link2="gripper_jaw_r" reason="Never"/>
+    <disable_collisions link1="gripper_base" link2="gripper_jaw_l" reason="Adjacent"/>
+    <disable_collisions link1="gripper_base" link2="gripper_jaw_r" reason="Adjacent"/>
 </robot>

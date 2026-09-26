@@ -14,6 +14,13 @@ from typing import Dict, List, Tuple
 
 import yaml
 
+# 工件底面离支撑面(工位标记板 / 台面)抬起的高度: 1mm, 避免与支撑面贴死
+# 导致接触误判。场景生成器按它摆放工件(见 scene_generator), 抓取高度校核
+# 必须用同一个值 —— 差 1mm 就会让 arena_check 的"末端几何"和"末端可达性"
+# 打印出两套互相矛盾的数字。
+OBJECT_LIFT = 0.001
+
+
 def _repo_config(name: str) -> str:
     """源码目录下的 config 路径(脱离 ROS 安装时使用)。"""
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -147,18 +154,34 @@ class Arena:
         q = self.raw["track1"]["qr"]
         return Box(tuple(q["center"]), (q["size"], q["size"]))
 
-    @property
-    def t1_grasp_z(self) -> float:
-        return float(self.raw["track1"]["grasp_z"])
-
-    @property
-    def t1_release_z(self) -> float:
-        return float(self.raw["track1"]["release_z"])
-
     # ---- 末端几何 ----
     @property
+    def gripper(self) -> str:
+        """末端类型: ``wheeltec``(WHEELTEC 二指柔性爪) / ``none``(实心法兰)。"""
+        return str(self.raw["tool"].get("gripper", "none")).lower()
+
+    @property
+    def has_gripper(self) -> bool:
+        return self.gripper not in ("none", "false", "")
+
+    @property
     def flange_height(self) -> float:
+        """Link_6 网格伸出 dummy_tcp 下方的长度(= 机械臂法兰安装面)。"""
         return float(self.raw["tool"]["flange_height"])
+
+    @property
+    def tip_depth(self) -> float:
+        """TCP 到夹爪最低点(刀尖)的距离。实测自 3D 模型, 见 wheeltec_gripper。"""
+        return float(self.raw["tool"].get("tip_depth", self.flange_height))
+
+    @property
+    def tip_clearance(self) -> float:
+        """刀尖离"被抓工件底面所在的平面"要留的余量。
+
+        它同时是抓取时刀尖离台面/工位板的余量(工件就坐在那上面)。
+        """
+        return float(self.raw["tool"].get("tip_clearance",
+                                          self.raw["tool"]["clearance"]))
 
     @property
     def clearance(self) -> float:
@@ -168,17 +191,112 @@ class Arena:
     def approach_lift(self) -> float:
         return float(self.raw["tool"]["approach_lift"])
 
+    # ---- 机械臂可达性 ----
+    # 目标位姿"规划不出来"时, 先分清是**撞了**还是**根本到不了**: MoveIt 两种
+    # 情况都只回一个 error_code=99999(FAILURE), 光看返回值分不出来。
+    # 下面这几行用臂长直接算可达上限, 不用跑 IK —— 见 max_tcp_z。
+    @property
+    def _arm(self) -> Dict:
+        return self.raw.get("arm", {})
+
+    @property
+    def shoulder_z(self) -> float:
+        """J2 轴线高度 = 可达球的球心高度。"""
+        return float(self._arm.get("shoulder_z", 0.187))
+
+    @property
+    def reach_radius(self) -> float:
+        """大臂 + 小臂 = J2 到 J5 的最大距离。"""
+        return float(self._arm.get("upper_plus_forearm", 0.4205))
+
+    @property
+    def wrist_len(self) -> float:
+        """J5 到 dummy_tcp 的距离(沿工具轴)。"""
+        return float(self._arm.get("wrist_len", 0.1593))
+
+    def max_tcp_z(self, r: float) -> float:
+        """工具轴竖直向下时, 水平半径 ``r`` 处 TCP 能到的**最高**高度。
+
+        推导(全部来自 jaka_minicobo.urdf, 不依赖 IK 求解器):
+
+          * ``joint_6`` 的原点写在 J5 的 ``+y`` 上, 而 Link_6 的 ``+z``(工具轴)
+            按 ``rpy=-90°`` 展开后**也**是 J5 的 ``+y`` —— 也就是说 J5->TCP
+            这一段永远躺在工具轴上。工具朝下 => J5 恒在 TCP 正上方 ``wrist_len``。
+          * J5 必须落在以 J2 为心、``大臂+小臂`` 为半径的球内。
+
+        于是 ``r² + (z + wrist_len - shoulder_z)² ≤ (大臂+小臂)²``。
+
+        实测吻合(40 个随机种子打 ``/compute_ik``, 每次都是"全中/全不中"的硬边界):
+
+          ==========  ============  ============
+          r (mm)      公式上限(mm)  实测
+          ==========  ============  ============
+          385.4        195.9        195 全中 / 200 全不中
+          362.8        240.3        240 全中 / 245 全不中
+          355.0        253.1        248.6 全中
+          ==========  ============  ============
+        """
+        if r >= self.reach_radius:
+            return float("nan")
+        return (self.shoulder_z - self.wrist_len
+                + math.sqrt(self.reach_radius ** 2 - r * r))
+
+    def reach_ok(self, r: float, z: float, margin: float = 0.0) -> bool:
+        top = self.max_tcp_z(r)
+        return (not math.isnan(top)) and z <= top - margin
+
+    def reach_rows(self) -> List[Tuple[str, float, float, float, bool]]:
+        """末端必须到的高度逐点校核 -> (名称, r, z, 该半径上限, 是否可达)。
+
+        含赛道一 6 个工位的抓取/预抓取, 以及料盒中心与料盒内缘的转场/投放高度。
+        ``arena_check`` 直接打印这张表。
+        """
+        rows: List[Tuple[str, float, float, float, bool]] = []
+        sz = self.track1_max_workpiece_size
+        top = self.station_top + OBJECT_LIFT + sz
+        for i, x, y in self.stations():
+            z = self.grasp_tcp_z(top, sz)
+            rows.append((f"工位{i} 抓取", math.hypot(x, y), z,
+                         self.max_tcp_z(math.hypot(x, y)), self.reach_ok(math.hypot(x, y), z)))
+            za = self.approach_z(z)
+            rows.append((f"工位{i} 预抓取", math.hypot(x, y), za,
+                         self.max_tcp_z(math.hypot(x, y)), self.reach_ok(math.hypot(x, y), za)))
+        binr = math.hypot(*self.track1_bin.center)
+        gz0 = self.grasp_tcp_z(top, sz)
+        for name, r, z in (("料盒中心 转场", binr,
+                            self.transfer_tcp_z(gz0, sz, self.track1_bin)),
+                           ("料盒中心 投放", binr, self.release_tcp_z(sz))):
+            rows.append((name, r, z, self.max_tcp_z(r), self.reach_ok(r, z)))
+        return rows
+
     @property
     def touch_links(self) -> List[str]:
         return list(self.raw["tool"].get("touch_links", ["dummy_tcp", "Link_6"]))
 
-    def grasp_tcp_z(self, object_top_z: float) -> float:
-        """工件顶面高度 -> 抓取时 TCP 应有的高度。
+    def grasp_offset(self, object_size: float) -> float:
+        """TCP 到**工件顶面**的距离 —— 也就是工件"挂"在 TCP 下方多深。
 
-        URDF 里 Link_6 在 TCP 下方还延伸 ``flange_height``,
-        所以 TCP 必须抬到工件顶面之上, 否则法兰会插进工件、规划直接失败。
+        两种末端的区别就在这一个数上:
+
+        - 没有夹爪 (``gripper: none``): TCP 下方是一根实心法兰, 工件只能整个
+          吊在它下面, 所以工件顶面必须低于工具底面 ``clearance``:
+          ``flange_height + clearance``。
+        - WHEELTEC 柔性夹爪: 工件是**夹在两片指之间**的。两片指有 ``tip_depth``
+          那么长, 指间净距又随深度变大(往下越张越开), 所以工件可以坐得很深 ——
+          最深的合法位置是"刀尖刚好到工件底面"那一档:
+          ``tip_depth + tip_clearance - object_size``。
+
+          这一条决定了竞赛里的作业高度: 赛道一 50mm 工件 -> 顶面在 TCP 下方
+          159.6mm(不带夹爪时是 46mm)。抬得高不高、能不能夹到台面上的小工件,
+          全看这个数对不对 —— 它必须**正好**等于 URDF 里刀尖到 TCP 的距离。
         """
-        return object_top_z + self.flange_height + self.clearance
+        if not self.has_gripper:
+            return self.flange_height + self.clearance
+        return self.tip_depth + self.tip_clearance - object_size
+
+    def grasp_tcp_z(self, object_top_z: float, object_size: float) -> float:
+        """工件顶面高度 -> 抓取时 TCP 应有的高度(工件落在指间最深处)。"""
+        return object_top_z + self.grasp_offset(object_size)
 
     def approach_z(self, grasp_z: float) -> float:
         return grasp_z + self.approach_lift
@@ -191,19 +309,75 @@ class Arena:
     def release_margin(self) -> float:
         return float(self.raw["tool"].get("release_margin", 0.003))
 
-    @property
-    def grasp_offset(self) -> float:
-        """抓取时工件中心到 TCP 的距离(工件挂在 TCP 下方这么远)。"""
-        return self.flange_height + self.clearance
-
     def release_tcp_z(self, object_size: float) -> float:
         """把工件放进料盒时 TCP 应有的高度。
 
-        工件抓起来后一直挂在 TCP 下方 ``grasp_offset + size/2`` 处,
-        所以 TCP 不能直接下到料盒里 —— 要按工件实际占位反推。
+        工件底面离 TCP ``grasp_offset(size) + size`` ——
+        用夹爪时它等于 ``tip_depth + tip_clearance``(刀尖位置), 与工件尺寸无关;
+        用实心法兰时是 ``flange_height + clearance + size``。
         """
-        return (self.bin_floor + self.release_margin + self.grasp_offset
-                + object_size)
+        return (self.bin_floor + self.release_margin
+                + self.grasp_offset(object_size) + object_size)
+
+    # ---- 转场高度 ----
+    def _is_track1_bin(self, bin_box: Box) -> bool:
+        return all(abs(a - b) < 1e-9
+                   for a, b in zip(self.track1_bin.center, bin_box.center))
+
+    def bin_top_z(self, bin_box: Box) -> float:
+        """料盒**侧墙顶面**高度。"""
+        h = (self.track1_bin_height if self._is_track1_bin(bin_box)
+             else self.track2_bin_height)
+        return float(self.table["top_z"]) + h
+
+    @property
+    def station_top(self) -> float:
+        """工位标记板顶面高度 —— 工件坐在它上面(与 scene_generator 一致)。"""
+        return float(self.raw["track1"]["station_thickness"])
+
+    @property
+    def track1_max_workpiece_size(self) -> float:
+        return max(float(w["size"]) for w in self.raw["track1"]["workpieces"])
+
+    @property
+    def track2_max_object_size(self) -> float:
+        return float(self.raw["track2"]["object_size_range"][1])
+
+    def source_area_top_z(self, bin_box: Box) -> float:
+        """工件区最高的东西有多高(工位板 + 最高的一件工件, 或桌面 + 最高工件)。"""
+        if self._is_track1_bin(bin_box):
+            return (float(self.table["top_z"])
+                    + float(self.raw["track1"]["station_thickness"])
+                    + OBJECT_LIFT
+                    + self.track1_max_workpiece_size)
+        return float(self.table["top_z"]) + self.track2_max_object_size
+
+    def transfer_tcp_z(self, grasp_z: float, object_size: float,
+                       bin_box: Box) -> float:
+        """**抬着工件转场**时 TCP 该到的高度。
+
+        工件抓起来后挂在 TCP 下方 ``grasp_offset(size) + size`` 处(那是它的
+        **底面**, 见 grasp_offset)。要让工件越过一个高 ``obs`` 的障碍, TCP 至少
+        得抬到 ``obs + 间隙 + grasp_offset(size) + size``。障碍取料盒侧墙与工件区
+        最高件中较高者。
+
+        用 WHEELTEC 夹爪时 ``grasp_offset + size`` 恒等于刀尖深度, 所以它同时也
+        保证了刀尖不撞障碍。
+
+        为什么必须显式抬够 —— 这一条不看数据很难想到: 抬不够时关节空间的直线
+        会撞, 规划器(退回 OMPL)就绕出一条**往外甩、往上拱**的大弧。实测赛道一
+        抬 135mm 时末端拱到 **354mm**、半径甩到 460mm(超出 420mm 作业带);
+        显式抬到 159mm(= 本函数在 gripper: none 下的结果)之后总高度反而
+        降到 160mm 上下, 又直又短。
+        "抬够" 和 "抬得高" 是反直觉的: **抬不够才真的抬得高**。
+
+        间隙可在 ``arena.yaml`` 的 ``tool.transfer_margin`` 里调(默认 10mm)。
+        """
+        margin = float(self.raw["tool"].get("transfer_margin", 0.010))
+        obs = max(self.bin_top_z(bin_box), self.source_area_top_z(bin_box))
+        return max(self.approach_z(grasp_z),
+                   obs + margin + self.grasp_offset(object_size)
+                   + object_size)
 
     # ---- 赛道二 ----
     @property
@@ -307,10 +481,34 @@ class Arena:
         return problems
 
 
+GRIPPER_ENV = "JAKA_GRIPPER"
+
+
+def _env_tool(raw: Dict) -> Dict:
+    """``JAKA_GRIPPER`` 环境变量覆盖 ``tool.gripper``。
+
+    为什么要一个环境变量: 换末端要同时改三处(arena.yaml 的抓取高度、URDF 的
+    ``with_gripper``、launch 的 ``use_gripper``), 三处漏一处就会撞工件或让
+    MoveIt 觉得末端比实际短。让 xacro 和本模块读**同一个**变量, 换末端就只剩
+    一个开关:
+
+        JAKA_GRIPPER=1 ros2 launch jaka_competition_kit round.launch.py ...
+
+    取值: 1/true/yes/on/wheeltec -> wheeltec; 0/false/no/off/none -> none;
+    没设(或空) -> 用 arena.yaml 里写的值。
+    """
+    v = os.environ.get(GRIPPER_ENV, "").strip().lower()
+    if v in ("", "default"):
+        return raw
+    tool = raw.setdefault("tool", {})
+    tool["gripper"] = "wheeltec" if v in ("1", "true", "yes", "on", "wheeltec") else "none"
+    return raw
+
+
 def load_arena(path: str | None = None) -> Arena:
     path = path or default_config_path()
     with open(path, "r", encoding="utf-8") as f:
-        return Arena(raw=yaml.safe_load(f), config_path=path)
+        return Arena(raw=_env_tool(yaml.safe_load(f)), config_path=path)
 
 
 def load_rules(path: str | None = None) -> Dict:

@@ -32,7 +32,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from .arena import Arena, Box, load_arena, radius
+from .arena import OBJECT_LIFT, Arena, Box, load_arena, radius
 from .qr import make_order, parse, payload, render_png
 from .scene import SceneClient, bin_container, box_object, cylinder_object
 
@@ -205,8 +205,8 @@ class SceneGenerator(rclpy.node.Node):
             lib_item = lib[i - 1]
             size = float(lib_item["size"])
             obj_id = f"wp_{i}"
-            # 工件坐在工位标记板上, 底面 z = 板厚 + 1mm 间隙(避免贴面误判)
-            z_bottom = self.station_top + 0.001
+            # 工件坐在工位标记板上, 底面 z = 板厚 + OBJECT_LIFT(避免贴面误判)
+            z_bottom = self.station_top + OBJECT_LIFT
             objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
                                    (size, size, size), z_bottom=z_bottom))
             top = z_bottom + size
@@ -214,8 +214,8 @@ class SceneGenerator(rclpy.node.Node):
                 "id": obj_id, "station": i, "label": lib_item["name"],
                 "xy": [x, y], "size": size, "z": z_bottom + size / 2.0,
                 "top_z": top, "shape": "box",
-                "grasp_tcp_z": self.arena.grasp_tcp_z(top),
-                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top)),
+                "grasp_tcp_z": self.arena.grasp_tcp_z(top, size),
+                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top, size)),
                 "release_tcp_z": self.arena.release_tcp_z(size),
             })
         self.scene.apply(objs)
@@ -279,16 +279,16 @@ class SceneGenerator(rclpy.node.Node):
             shape = "cylinder" if i % 4 == 0 else "box"
             if shape == "cylinder":
                 objs.append(cylinder_object(obj_id, self.arena.frame_id,
-                                            (x, y, half + 0.001), half, size))
+                                            (x, y, half + OBJECT_LIFT), half, size))
             else:
                 objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
-                                       (size, size, size), z_bottom=0.001))
-            top = 2 * half + 0.001
+                                       (size, size, size), z_bottom=OBJECT_LIFT))
+            top = 2 * half + OBJECT_LIFT
             manifest.append({
                 "id": obj_id, "label": labels[i - 1], "xy": [x, y],
-                "size": size, "z": half + 0.001, "top_z": top, "shape": shape,
-                "grasp_tcp_z": self.arena.grasp_tcp_z(top),
-                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top)),
+                "size": size, "z": half + OBJECT_LIFT, "top_z": top, "shape": shape,
+                "grasp_tcp_z": self.arena.grasp_tcp_z(top, size),
+                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top, size)),
                 "release_tcp_z": self.arena.release_tcp_z(size),
             })
         self.scene.apply(objs)

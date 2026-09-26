@@ -1,15 +1,22 @@
-"""夹爪抽象。
+"""夹爪抽象 —— 末端执行器的统一接口。
 
-官方仓库**不包含夹爪驱动**,所以这里定义最小接口 + 两个实现:
+    SimGripper      —— 仿真: 把手指角度发给 ``/gripper_controller/commands``
+                       (ros2_control 的 JointGroupPositionController, 见
+                       jaka_ros2/src/wheeltec_gripper)。
+    WheeltecGripper —— 真机: WHEELTEC MS42DC 柔性爪, 走 ``step_motor`` 包的
+                       串口协议(话题 ``/motor_control``), 而不是 ros2_control。
+    MockGripper     —— 不驱动任何东西, 只保证流程能跑通。
+    JakaIOGripper   —— 老的真机方案: 用 jaka_driver 的工具端数字 IO 控制夹爪。
 
-  MockGripper   —— 不驱动任何硬件, 只在夹爪状态变化时发布事件。仿真用。
-  JakaIOGripper —— 通过 jaka_driver 的 ``/jaka_driver/set_io`` 驱动工具端数字 IO。
-                   真机用, 需要按你实际夹爪的 IO 编号与电平改 ``open_level``/``closed_level``。
+队伍如果自备夹爪, 只要实现 ``open()`` / ``close(object_size)`` 两个方法即可接入。
 
-队伍如果自备夹爪, 只要实现 ``open()`` / ``close()`` 两个方法即可接入。
+**闭合角度是按工件尺寸算的**: 夹爪要"夹住"工件, 不能当没看见它 ——
+真机靠堵转保护(顶到工件就停), 仿真没有这回事, 只能按几何把指间净距收到
+工件宽度 + 一点缝(见 arena.yaml 的 jaw_gap_* 三个参数)。
 """
 from __future__ import annotations
 
+import math
 import time
 from typing import Optional
 
@@ -23,7 +30,8 @@ class Gripper:
     def open(self) -> bool:
         raise NotImplementedError
 
-    def close(self) -> bool:
+    def close(self, object_size: float | None = None) -> bool:
+        """闭合。``object_size`` 给出工件宽度, 只影响"收到多紧"。"""
         raise NotImplementedError
 
     def close_ms(self) -> int:
@@ -46,7 +54,7 @@ class MockGripper(Gripper):
         self.is_closed = False
         return True
 
-    def close(self) -> bool:
+    def close(self, object_size: float | None = None) -> bool:
         if self.node is not None:
             rclpy.spin_once(self.node, timeout_sec=self.close_delay)
         else:
@@ -102,17 +110,147 @@ class JakaIOGripper(Gripper):
     def open(self) -> bool:
         return self._set(self.open_level)
 
-    def close(self) -> bool:
+    def close(self, object_size: float | None = None) -> bool:
         return self._set(self.closed_level)
 
     def close_ms(self) -> int:
         return int(self.settle * 1000)
 
 
-def make_gripper(mode: str, node=None, **kwargs) -> Gripper:
+class SimGripper(Gripper):
+    """仿真: 把两片指的关节角发给 ros2_control 的 ``gripper_controller``。
+
+    关节角 -> 指间净距的换算用 arena.yaml 里实测的三个数:
+    ``jaw_gap_open``(张开时净距) / ``jaw_gap_per_deg``(每合 1° 少多少) /
+    ``jaw_limit_deg``(两片指不互相干涉的最大角)。
+    """
+
+    name = "sim"
+
+    def __init__(self, node, arena=None, topic: str = "/gripper_controller/commands",
+                 open_angle: float = 0.0, close_delay: float = 0.35):
+        from std_msgs.msg import Float64MultiArray
+        self.node = node
+        self.arena = arena
+        self.open_angle = float(open_angle)
+        self.close_delay = float(close_delay)
+        self._msg_type = Float64MultiArray
+        self.pub = node.create_publisher(Float64MultiArray, topic, 10)
+        self.is_closed = False
+        if not arena or not arena.has_gripper:
+            node.get_logger().warn(
+                "arena.yaml 里 tool.gripper 不是 wheeltec: 仿真夹爪不会动作")
+
+    def _angle_for(self, object_size: float | None) -> float:
+        """工件尺寸 -> 关节角(rad), 让指间净距刚好收在工件两侧。"""
+        a = self.arena
+        gap_open = a.raw["tool"].get("jaw_gap_open", 0.076)
+        per_deg = a.raw["tool"].get("jaw_gap_per_deg", 0.001265)
+        limit = a.raw["tool"].get("jaw_limit_deg", 37.3)
+        extra = a.raw["tool"].get("jaw_gap_extra", 0.004)
+        if object_size is None:
+            deg = limit                       # 不知道自己夹的是什么: 合到底
+        else:
+            deg = (gap_open - (object_size + extra)) / per_deg
+            deg = max(0.0, min(float(limit), float(deg)))
+        return math.radians(deg)
+
+    def _send(self, angle: float) -> bool:
+        msg = self._msg_type()
+        msg.data = [float(angle), float(angle)]   # 两个关节"正数=闭合"同号
+        self.pub.publish(msg)
+        if self.node is not None:
+            end = time.time() + self.close_delay
+            while time.time() < end:
+                rclpy.spin_once(self.node, timeout_sec=0.02)
+        return True
+
+    def open(self) -> bool:
+        self.is_closed = False
+        return self._send(self.open_angle)
+
+    def close(self, object_size: float | None = None) -> bool:
+        self.is_closed = True
+        return self._send(self._angle_for(object_size))
+
+    def close_ms(self) -> int:
+        return int(self.close_delay * 1000)
+
+
+class WheeltecGripper(Gripper):
+    """真机: WHEELTEC MS42DC 二指柔性爪(驱控一体步进电机, USB 串口)。
+
+    走厂家 ``step_motor`` 包的协议: 往 ``/motor_control`` 发
+    ``step_motor/msg/Motor``; 那个节点把帧发给电机(见
+    jaka_ros2/src/step_motor/src/motor_node.cpp, 帧格式 7B ... 7D + BCC 异或)。
+
+    协议要点(见《驱控一体步进电机 ROS 控制使用手册》):
+      mode=2 相对角度模式, 角度放大 10 倍发送(单位 0.1°), 角度是**增量**;
+      转向 0 = 逆时针 = 张开, 1 = 顺时针 = 闭合;
+      细分 32 建议值; speed 单位 rad/s, 也放大 10 倍;
+      完全闭合需要顺时针 5.2 圈(1872°) —— 夹到工件会堵转自停, 所以
+      "发够大的角度"就是"夹紧"的用法。
+    """
+
+    name = "wheeltec"
+
+    def __init__(self, node, motor_id: int = 1, speed: int = 200,
+                 sub_divide: int = 32, angle_deg: float = 1872.0,
+                 settle: float = 1.2, topic: str = "/motor_control"):
+        from step_motor.msg import Motor      # 懒加载: 没装 step_motor 也能用别的夹爪
+        self.node = node
+        self._Motor = Motor
+        self.motor_id = int(motor_id)
+        self.speed = int(speed)
+        self.sub_divide = int(sub_divide)
+        self.angle_deg = float(angle_deg)
+        self.settle = float(settle)
+        self.pub = node.create_publisher(Motor, topic, 10)
+        self.is_closed = False
+        node.get_logger().info(
+            f"WHEELTEC 夹爪: 话题 {topic}, id={motor_id}, speed={speed}×0.1rad/s, "
+            f"细分 {sub_divide}, 行程 {angle_deg:.0f}°(需先 ros2 run step_motor motor_node)")
+
+    def _send(self, direction: int) -> bool:
+        msg = self._Motor()
+        msg.id = self.motor_id
+        msg.speed = self.speed
+        msg.dir = direction
+        msg.mode = 2                       # 相对角度
+        msg.angle = int(self.angle_deg * 10)   # 协议规定放大 10 倍
+        msg.state = 0                      # 0 = 控制, 1 = 查询状态
+        msg.sub_divide = self.sub_divide
+        self.pub.publish(msg)
+        if self.node is not None:
+            end = time.time() + self.settle
+            while time.time() < end:
+                rclpy.spin_once(self.node, timeout_sec=0.02)
+        return True
+
+    def open(self) -> bool:
+        self.is_closed = False
+        return self._send(0)               # 逆时针 = 张开
+
+    def close(self, object_size: float | None = None) -> bool:
+        self.is_closed = True
+        return self._send(1)               # 顺时针 = 闭合(顶到工件即堵转自停)
+
+    def close_ms(self) -> int:
+        return int(self.settle * 1000)
+
+
+def make_gripper(mode: str, node=None, arena=None, **kwargs) -> Gripper:
     mode = (mode or "mock").lower()
     if mode == "mock":
         return MockGripper(node, **kwargs)
-    if mode in ("jaka_io", "real"):
+    if mode in ("sim", "gazebo"):
+        return SimGripper(node, arena=arena, **kwargs)
+    if mode in ("wheeltec", "step_motor"):
+        return WheeltecGripper(node, **kwargs)
+    if mode in ("jaka_io",):
         return JakaIOGripper(node, **kwargs)
-    raise ValueError(f"未知夹爪模式: {mode!r} (可选 mock / jaka_io)")
+    if mode == "real":
+        # 真机默认用厂家夹爪; 用 jaka_driver 的 IO 夹爪请显式写 gripper:=jaka_io
+        return WheeltecGripper(node, **kwargs)
+    raise ValueError(
+        f"未知夹爪模式: {mode!r} (可选 sim / wheeltec / mock / jaka_io)")

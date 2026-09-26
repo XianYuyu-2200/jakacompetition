@@ -15,13 +15,55 @@ work_band:
 # 工具竖直向下的姿态(绕 X 转 180 度)
 tool_down_quat: [1.0, 0.0, 0.0, 0.0]
 
-# 末端几何 —— URDF 里没有夹爪模型, 必须显式建模, 否则法兰会插进工件里
+# 机械臂几何 —— 用来校核"末端能不能到"(见 Arena.max_tcp_z)。
+# 数值直接量自 jaka_description/urdf/jaka_minicobo.urdf, 对照见
+# docs/JAKA-Mini2-参数速查.md。JAKA Mini 2 与 MiniCobo 运动学一致, 臂展 580mm。
+arm:
+  shoulder_z: 0.187        # joint_1/joint_2 轴线高度 = 可达球心的高度
+  upper_plus_forearm: 0.4205   # J2 -> J5(大臂 210 + 小臂 210.5)
+  wrist_len: 0.1593        # J5 -> dummy_tcp(沿工具轴)
+
+# 末端几何 —— URDF 里的夹爪必须在这里显式建模, 否则规划器不知道末端有多长
 tool:
+  # 末端是什么夹爪(默认值; 也可用环境变量 JAKA_GRIPPER=1 临时切到 wheeltec):
+  #   none     —— 裸法兰 / 行程几十毫米的小平行夹爪。**规则书规定的就是它**
+  #               (《赛题细则》赛道一: 末端执行器 = 电动平行夹爪, 行程 0-30mm),
+  #               工件只能吊在法兰下方, 抓取高度由 flange_height 决定。
+  #   wheeltec —— WHEELTEC MS42DC 二指柔性爪(见 jaka_ros2/src/wheeltec_gripper)。
+  #               165mm 高、97mm 长的手指, 工件是**夹在两片指之间**的,
+  #               抓取高度由 tip_depth(204.6mm)决定 —— 比裸法兰高 **114mm**。
+  #
+  # 换末端必须同时改三处, 否则会撞工件/撞台面:
+  #   1) 这里(抓取/转场/投放高度)
+  #   2) URDF: xacro ... with_gripper:=true(环境变量 JAKA_GRIPPER=1)
+  #   3) 夹爪控制器: ros2 launch ... use_gripper:=true
+  #
+  # ⚠ 可达性: wheeltec 的 204.6mm 刀尖把抓取高度抬到 213.6mm, 而 580mm 臂展的
+  #   机械臂在 r=385mm 处工具朝下最多只到 195.9mm(见 Arena.max_tcp_z)——
+  #   **工位4/6(r=385mm)与料盒中心(r=363mm)都超出了可达范围**。
+  #   跑 `ros2 run jaka_competition_kit arena_check` 会逐点报出来。
+  #   详见 docs/WHEELTEC柔性机械爪.md 第 4 节。
+  gripper: none
   # Link_6 网格在 dummy_tcp 下方延伸的高度(实测 39mm)。TCP 到这个高度之间
-  # 都是实体, 抓取时工件顶面必须低于它。
+  # 都是实体 —— 也就是机械臂的法兰面, 夹爪的转接板贴在这里。
   flange_height: 0.040
-  # 工件顶面到法兰底面的安全间隙
+  # 工件顶面到法兰底面的安全间隙(gripper: none 时用)
   clearance: 0.006
+  # --- gripper: wheeltec 专用 ---
+  # TCP 到夹爪最低点(两片指的刀尖)的距离。实测自 3D 模型, 与
+  # jaka_ros2/src/wheeltec_gripper/config/gripper.yaml 的 tip_depth 必须一致。
+  tip_depth: 0.2046
+  # 刀尖离"工件底面所在平面"的余量(= 抓取时刀尖离台面/工位板的余量)。
+  # 不能压到 3mm 以下: 位置约束和 TF 抖动会把它吃掉 -> 刀尖戳进工位板。
+  tip_clearance: 0.005
+  # 手指张合(实测自 3D 模型): 张开时在被抓深度上指间净距 76mm,
+  # 每闭合 1° 净距减少 1.265mm, 最多合 37.3°(再合两片指就互相干涉)。
+  # 仿真夹爪按这些数把"工件尺寸"换算成手指角度, 见 gripper.py 的 SimGripper。
+  jaw_gap_open: 0.076
+  jaw_gap_per_deg: 0.001265
+  jaw_limit_deg: 37.3
+  # 夹紧时比工件再多留的缝(纯视觉: 免得手指看起来插进工件里)
+  jaw_gap_extra: 0.004
   # 预抓取点比抓取点再抬高多少
   approach_lift: 0.035
   # 料盒底板厚度(工件要落在它上面)
@@ -32,9 +74,18 @@ tool:
   # INVALID_MOTION_PLAN(-2)。留 12mm 等价于"离底 12mm 松手让它掉下去",
   # 真实作业里本来也是这么放的。
   release_margin: 0.012
+  # 抬着工件转场时, 工件**底面**越过障碍顶面要留的间隙。
+  # 这是转场高度唯一的可调余量: 高度 = 障碍最高点 + 本值 + 末端最低点
+  # 到工件底面的距离(见 Arena.transfer_tcp_z())。
+  # 不能压到 5mm 以下 —— 位置约束与 TF 抖动会把它吃掉, 关节空间的直线又会
+  # 撞到邻件而退回 OMPL 绕大弧(那才是看起来"抬得高"的真正原因)。
+  transfer_margin: 0.010
   # 附着工件后允许与之接触的连杆(不参与碰撞) —— 必须显式列出,
   # 否则工件会一直和法兰/腕部报碰撞
-  touch_links: [dummy_tcp, Link_6, Link_5, Link_4]
+  # 末端夹爪的三个 link 也要列进来: 工件就是被手指夹住的, 不豁免的话
+  # MoveIt 会认为"附着工件与手指碰撞", 之后所有规划都返回失败
+  touch_links: [dummy_tcp, gripper_base, gripper_jaw_l, gripper_jaw_r,
+                Link_6, Link_5, Link_4]
 
 # 安全复位位姿(所有失败处理都退回这里)
 home:

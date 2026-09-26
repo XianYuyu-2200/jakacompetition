@@ -49,4 +49,7 @@
   <export>
       <build_type>ament_cmake</build_type>
   </export>
+
+  <!-- 末端夹爪的网格与 URDF 宏(装在 dummy_tcp 上) -->
+  <exec_depend>wheeltec_gripper</exec_depend>
 </package>

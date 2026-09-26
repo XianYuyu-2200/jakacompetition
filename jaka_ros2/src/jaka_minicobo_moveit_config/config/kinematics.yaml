@@ -1,4 +1,9 @@
 jaka_minicobo:
-  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  # LMA(列文伯格-马夸尔特)比 KDL 默认的牛顿迭代稳得多: 本臂 J5 接近 ±90° 时
+  # 手腕处于奇异位形, 牛顿迭代从给定种子经常不收敛 -> 插件改用随机种子重启,
+  # 于是同一个目标"有时解到最优分支、有时解到绕大圈的分支"。表现为抓取动作
+  # 时好时坏。LMA 是阻尼最小二乘, 从种子出发几乎总能收敛到"离种子最近"的解。
+  kinematics_solver: lma_kinematics_plugin/LMAKinematicsPlugin
   kinematics_solver_search_resolution: 0.005
-  kinematics_solver_timeout: 0.005
+  # 原来 0.005s(5ms) 太短, 种子解还没收敛就被判失败。50ms 足够。
+  kinematics_solver_timeout: 0.05

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="jaka_minicobo_ros2_control" params="name initial_positions_file use_gazebo use_rviz_sim">
+    <xacro:macro name="jaka_minicobo_ros2_control" params="name initial_positions_file use_gazebo use_rviz_sim with_gripper">
         <xacro:property name="initial_positions" value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
         <ros2_control name="${name}" type="system">
@@ -58,6 +58,24 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
+
+            <!-- 夹爪两片指: 由 gripper_controller 驱动(位置控制), 初始 0 = 张开 -->
+            <xacro:if value="${with_gripper}">
+              <joint name="gripper_jaw_l_joint">
+                  <command_interface name="position"/>
+                  <state_interface name="position">
+                    <param name="initial_value">0.0</param>
+                  </state_interface>
+                  <state_interface name="velocity"/>
+              </joint>
+              <joint name="gripper_jaw_r_joint">
+                  <command_interface name="position"/>
+                  <state_interface name="position">
+                    <param name="initial_value">0.0</param>
+                  </state_interface>
+                  <state_interface name="velocity"/>
+              </joint>
+            </xacro:if>
 
         </ros2_control>
     </xacro:macro>

@@ -10,6 +10,12 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+    # 夹爪: 两片指一起位置控制, 话题 /gripper_controller/commands
+    # (std_msgs/Float64MultiArray, 单位 rad, 正数=闭合)。
+    # 真机上这两个关节由 step_motor 包(串口)驱动, 不走 ros2_control。
+    gripper_controller:
+      type: position_controllers/JointGroupPositionController
+
 jaka_minicobo_controller:
   ros__parameters:
     joints:
@@ -24,3 +30,9 @@ jaka_minicobo_controller:
     state_interfaces:
       - position
       - velocity
+gripper_controller:
+  ros__parameters:
+    joints:
+      - gripper_jaw_l_joint
+      - gripper_jaw_r_joint
+    interface_name: position

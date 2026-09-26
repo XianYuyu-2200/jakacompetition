@@ -75,9 +75,16 @@ class Executor:
     # ---------- 原语 ----------
     def _move(self, x: float, y: float, z: float, label: str = "",
               straight: bool = False):
-        """straight=True 时优先走笛卡尔直线, 不行再退回关节空间规划。
+        """straight=True 时优先走笛卡尔直线(LIN), 不行再退回关节空间规划。
 
-        竖直的下降/抬起/投放都该走直线 —— 见 MoveGroupBackend.goto_xyz_straight。
+        **凡是"末端该走空间直线"的动作都要开**: 竖直的下降/抬起/投放/退出,
+        以及工位与料盒之间的转场(approach / to_bin)。
+
+        为什么转场也必须走 LIN: 关节空间的直线 **不是** 空间里的直线。跨基座
+        转场(比如工位4 `(-150,355)` -> 料盒 `(315,180)`)时 PTP 的关节直线会
+        和场景碰撞, 退回 OMPL 后它会绕出一条**往外甩、往上拱**的路径 ——
+        实测末端从指令高度 135mm 拱到 **354mm**、半径甩到 460mm(超出 420mm
+        作业带)。LIN 走的是半径 0.28~0.39m 的那条空间直线, 又直又短。
         """
         t0 = time.time()
         res = MoveResult(False, -1, 0.0)
@@ -93,7 +100,7 @@ class Executor:
         if self.timing_log:
             self.node.get_logger().info(
                 f"    [timing] {label:9s} {'ok ' if res.ok else 'FAIL'} "
-                f"{time.time() - t0:5.2f}s")
+                f"{time.time() - t0:5.2f}s ({res.via})")
         if res.ok:
             self.tcp_xyz = (x, y, z)
         else:
@@ -104,6 +111,9 @@ class Executor:
         return self._move(x, y, z, label)
 
     def approach(self, x: float, y: float, z: Optional[float] = None):
+        # 这里**不**走 LIN: 一局开始时机械臂处在零位(工具朝天, TCP 在 z≈0.77),
+        # 和目标(工具朝下)差了 180° 姿态, 笛卡尔直线要边平移边翻转, 实测
+        # 第一段 approach 从 3.3s 涨到 30.6s。转场交给关节规划(PTP)更快。
         return self._move(x, y, z if z is not None else self.pre_grasp_z, "approach")
 
     def descend(self, z: float):
@@ -159,7 +169,9 @@ class Executor:
         只给 id 的话 MoveIt 会认为物体位姿是相对末端的, 把物体中心放到 TCP
         原点上, 立刻和法兰重叠, 之后所有规划都返回 INVALID_MOTION_PLAN。
         """
-        self.gripper.close()
+        # 夹爪按工件实际宽度收 —— 仿真里没有堵转保护, 不告诉它尺寸手指
+        # 会直接穿过工件(真机靠堵转自停, 传不传都一样)
+        self.gripper.close(object_size=size)
         self.wait_until_settled()
         tcp_xyz, tcp_quat = self.tcp_pose()
         rel = _relative_pose(tcp_xyz, tcp_quat,
@@ -183,7 +195,8 @@ class Executor:
 
     def go_to_bin(self, bin_box: Box, z: Optional[float] = None):
         return self._move(bin_box.center[0], bin_box.center[1],
-                          z if z is not None else self.pre_grasp_z, "to_bin")
+                          z if z is not None else self.pre_grasp_z,
+                          "to_bin", straight=True)
 
     def recover(self, drop_object: Optional[str] = None,
                 restore: Optional[Tuple[float, float, float, float]] = None) -> None:
@@ -225,22 +238,30 @@ class Executor:
         否则附着在末端的工件会让后续所有规划都失败。
         """
         az = approach_z if approach_z is not None else grasp_tcp_z + self.arena.approach_lift
+        # **转场平面**和"预抓取高度"是两件事, 不能混用:
+        #   az —— 悬停在抓取点上方多少(贴近工件, 越短越好)
+        #   tz —— 抬着工件在场地里走时 TCP 该到的高度。必须让手里的工件
+        #         越过料盒侧墙和旁边工件的顶面, 否则规划器会绕出一条大弧
+        #         (实测末端从 135mm 拱到 354mm)。见 Arena.transfer_tcp_z()。
+        tz = self.arena.transfer_tcp_z(grasp_tcp_z, size, bin_box)
         # 工件原始底面高度: 复位时按它放回原位
         z_bottom = object_center_z - size / 2.0
         back = (x, y, z_bottom, size)
         if not self.approach(x, y, az).ok:
             self.recover()
             return False
-        if not self.move_to(x, y, grasp_tcp_z, "descend").ok:
+        # 下降和抬起对称, 也走笛卡尔直线: 关节空间规划在手腕奇异附近可能
+        # 换 IK 分支, 末端划一道弧线出来(工件蹭到邻居 / 工位板)。
+        if not self._move(x, y, grasp_tcp_z, "descend", straight=True).ok:
             self.recover()
             return False
         if not self.grasp(object_id, size, (x, y, object_center_z)):
             self.recover()
             return False
-        if not self._move(x, y, az, "lift", straight=True).ok:
+        if not self._move(x, y, tz, "lift", straight=True).ok:
             self.recover(object_id, back)
             return False
-        if not self.go_to_bin(bin_box, az).ok:
+        if not self.go_to_bin(bin_box, tz).ok:
             self.recover(object_id, back)
             return False
         if not self._move(bin_box.center[0], bin_box.center[1], release_z,
@@ -248,7 +269,7 @@ class Executor:
             self.recover(object_id, back)
             return False
         self.release(object_id, bin_box)
-        self._move(bin_box.center[0], bin_box.center[1], az, "retreat", straight=True)
+        self._move(bin_box.center[0], bin_box.center[1], tz, "retreat", straight=True)
         return True
 
 

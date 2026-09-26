@@ -37,6 +37,31 @@ def main(args=None):
     print(f"  料盒  : ({b2.center[0]*1000:7.1f}, {b2.center[1]*1000:6.1f}) mm   r = "
           f"{math.hypot(*b2.center)*1000:6.1f} mm")
 
+    print("\n末端几何:")
+    print(f"  夹爪: {a.gripper}"
+          + (f"  (TCP -> 刀尖 {a.tip_depth*1000:.1f}mm, 刀尖余量 "
+             f"{a.tip_clearance*1000:.1f}mm)" if a.has_gripper else ""))
+    for label, top, size in (("赛道一 50mm 工件", 0.003 + 0.001 + 0.05, 0.05),
+                             ("赛道二 30mm 工件", 0.001 + 0.03, 0.03),
+                             ("赛道二 60mm 工件", 0.001 + 0.06, 0.06)):
+        gz = a.grasp_tcp_z(top, size)
+        print(f"  {label}: 抓取时 TCP z = {gz*1000:6.1f}mm "
+              f"(转场 {a.transfer_tcp_z(gz, size, a.track1_bin)*1000:.0f}mm, "
+              f"投放 {a.release_tcp_z(size)*1000:.0f}mm)")
+
+    print("\n末端可达性(工具轴竖直向下, 见 Arena.max_tcp_z):")
+    bad = 0
+    for name, r, z, top, ok in a.reach_rows():
+        bad += 0 if ok else 1
+        mark = "✔" if ok else "✘"
+        print(f"  {mark} {name:14s} r={r*1000:6.1f}mm  z={z*1000:6.1f}mm  "
+              f"该半径上限 {top*1000:6.1f}mm")
+    if bad:
+        print(f"  ⚠ 有 {bad} 个目标超出可达范围 —— 现在用的末端("
+              f"{a.gripper})在这个半径上够不到那么高。")
+        print("    换回行程几十毫米的小平行夹爪(gripper: none), "
+              "或参考 docs/WHEELTEC柔性机械爪.md 第 4 节调整布局。")
+
     problems = a.validate()
     print()
     if problems:

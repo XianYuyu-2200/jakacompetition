@@ -20,6 +20,10 @@
   <exec_depend>moveit_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
+  <!-- 真机用 WHEELTEC 柔性爪时才需要(串口驱动, 见 docs/WHEELTEC柔性机械爪.md);
+       纯仿真/只跑仿真夹爪时不装也能用 —— WheeltecGripper 是懒加载的 -->
+  <exec_depend>step_motor</exec_depend>
+  <exec_depend>wheeltec_gripper</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
