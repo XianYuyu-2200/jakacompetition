@@ -36,6 +36,25 @@ MoveGroup 目标 `error_code=1`,29 个轨迹点,执行后 `/joint_states` =
 - `screenshots/03-moveit-rviz-sim-startup.png` 启动后
 - `screenshots/04-moveit-rviz-sim-after-execute.png` 规划执行后
 
+## 二点五、Gazebo 镜像的位姿形状回归测试
+
+```bash
+source /opt/ros/humble/setup.bash
+source ../jaka_ros2/install/setup.bash
+python3 check_gz_scene_pose.py
+```
+
+不启动 Gazebo, 只用假 TF 检查 `GazeboSceneMirror._to_world()` 的两条返回路径
+(帧就是 `world` / 要过 TF) 返回同一种形状 `(x, y, z, (qx,qy,qz,qw))`, 并且
+`_same_pose` 不会再抛 `TypeError`。
+
+实测:`frame=world` 与 `frame=dummy_tcp` 都是 4 元组、平移合成正确、
+`_compose` 保持 `(pos, quat)` 契约 -> 全部通过。
+
+> 背景: 这两条路径形状不一致时, 工件一被 attach 就把镜像节点打死, 现象是
+> "RViz 里工件抓进料盒了, Gazebo 里的工件一直躺在工位上"。
+> 详见 `docs/Gazebo仿真.md` 第 2.4 节。
+
 ## 三、Gazebo 仿真(真物理)
 
 ```bash

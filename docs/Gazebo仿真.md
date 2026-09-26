@@ -69,6 +69,27 @@ Gazebo 里的这些几何默认 `collision=false`, 只是视觉。原因是它�
 
 要物理接触就 `collision:=true`, 但请自己确认轨迹还跟得上。
 
+### 2.4 工件: 抓起来会跟着走, 入盒后冻在画面里
+
+这两件事都是 2026-09 实测踩出来的, 现象都是"RViz 里对, Gazebo 里不对":
+
+**1. 工件一被抓住, 镜像节点就崩了 -> Gazebo 里的工件一直躺在工位上。**
+`GazeboSceneMirror._to_world()` 有两条返回路径: 帧就是 `world`(场地几何)、
+要过 TF(附着工件, 帧是 `dummy_tcp`)。它们必须返回**同一种形状**
+`(x, y, z, (qx,qy,qz,qw))`; 以前一条扁平、一条嵌套, 工件一 attach 就走嵌套
+那条, `_same_pose` 里 `abs(float - tuple)` 抛 `TypeError`, 把节点整个打死。
+现场表现就是"RViz 里工件进料盒了, Gazebo 里的工件没动"。
+回归测试: `python3 verification/check_gz_scene_pose.py`。
+
+**2. 入盒的工件会从规划场景里消失 -> 料盒在画面里是空的。**
+判分侧 `Scene.release_into_bin()` 会把入盒的工件从规划场景**移除**
+(已入库, 不再参与碰撞与规划)。镜像照规矩删的话, 抓完 6 件料盒里一件都看不到。
+默认 `keep_removed:=true` 把这些工件**冻结在最后位姿**(只对 `wp*`),
+下一轮出题时再跟着场景走。想恢复旧行为: `keep_removed:=false`。
+
+实测(seed 246135, 赛道一, Gazebo): 6 件全部落到料盒中心 `(0.315, 0.180)`,
+镜像节点全程存活, 成绩 100.0。
+
 ## 3. 用 Gazebo 判分之前必须重新标定限时
 
 **这是最容易出事的一点。**

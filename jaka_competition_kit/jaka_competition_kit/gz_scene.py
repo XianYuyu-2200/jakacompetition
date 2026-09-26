@@ -16,6 +16,18 @@ Gazebo 那条线(`demo_gazebo.launch.py`)跑的是**物理 + 机械臂本体**;
 工件被 attach 到末端时, 它在规划场景里的位姿是**相对末端坐标系**的,
 这里用 TF 换算到 world, 于是 Gazebo 里能看到工件跟着机械臂走。
 
+两个和"看着不对"直接相关的行为:
+
+1. **工件入盒后不删, 冻结在画面里。** 判分侧把入盒的工件从规划场景里移除
+   (`Scene.release_into_bin`), 照规矩删掉的话料盒在画面里永远是空的,
+   看不出这一轮抓了几件。``keep_removed``(默认 true, 只对 ``wp*``)改成
+   "冻结在最后位姿", 下一轮出题时再跟着场景走。
+2. **两条位姿路径必须返回同一种形状。** ``_to_world`` 既处理"frame 就是
+   world"(场地几何), 也处理"要过 TF"(附着工件)。曾经两者返回形状不一致,
+   工件一被 attach 就抛 TypeError 把节点打死 —— 现象是 "RViz 里工件进料盒了,
+   Gazebo 里的工件一直躺在工位上"。回归测试见
+   ``verification/check_gz_scene_pose.py``。
+
 数据来源是 **``/get_planning_scene`` 服务轮询**, 不是
 ``/monitored_planning_scene`` 话题 —— 那个是 VOLATILE 的, 晚订阅的节点
 收不到已有场景, 实测镜像会一个模型都不生成。
@@ -134,12 +146,20 @@ class GazeboSceneMirror(Node):
         self.declare_parameter("entity_prefix", "")
         self.declare_parameter("align_ground", True)
         self.declare_parameter("ground_model", "ground_plane")
+        # 工件放进料盒后, 判分侧会把它从规划场景里**移除**(见
+        # Scene.release_into_bin: 已入库, 不再参与碰撞与规划)。照规矩删的话
+        # 料盒在 Gazebo 画面里永远是空的, 看不出"这一轮抓了几件"。所以默认
+        # 把这些实体**冻结在最后位姿**留在画面里, 下一轮出题时再跟着场景走。
+        self.declare_parameter("keep_removed", True)
+        self.declare_parameter("keep_removed_prefix", "wp")
 
         self._world = str(self.get_parameter("world").value)
         self._collide = bool(self.get_parameter("collision").value)
         self._prefix = str(self.get_parameter("entity_prefix").value)
         self._align_ground = bool(self.get_parameter("align_ground").value)
         self._ground_model = str(self.get_parameter("ground_model").value)
+        self._keep_removed = bool(self.get_parameter("keep_removed").value)
+        self._keep_prefix = str(self.get_parameter("keep_removed_prefix").value)
         rate = float(self.get_parameter("update_rate").value)
 
         cbg = ReentrantCallbackGroup()
@@ -158,6 +178,7 @@ class GazeboSceneMirror(Node):
         self._target: Dict[str, Item] = {}
         self._live: Dict[str, str] = {}          # name -> 已创建的 geom key
         self._last_pose: Dict[str, Tuple] = {}
+        self._frozen: set = set()                # 已"冻结"在画面里的实体名
         self._scene_future = None
         self._ground_z: Optional[float] = None
 
@@ -166,7 +187,8 @@ class GazeboSceneMirror(Node):
         self.get_logger().info(
             f"Gazebo 场景镜像已启动: world={self._world}, "
             f"collision={'on' if self._collide else 'off(纯视觉)'}, "
-            f"{rate:.0f}Hz")
+            f"入盒后{'保留' if self._keep_removed else '删除'}"
+            f"({self._keep_prefix}*), {rate:.0f}Hz")
 
     # ---------- 规划场景 -> 目标集合 ----------
     def _ingest(self, msg: PlanningScene) -> None:
@@ -217,7 +239,18 @@ class GazeboSceneMirror(Node):
         self._target = target
 
     def _to_world(self, frame_id: str, pos, quat):
-        """把 frame_id 下的位姿换算到 world; 拿不到 TF 时返回 None。"""
+        """把 frame_id 下的位姿换算到 world; 拿不到 TF 时返回 None。
+
+        返回值**统一**是扁平的 ``(x, y, z, (qx, qy, qz, qw))`` —— ``_spawn``
+        和 ``_move`` 都按这个形状解构。
+
+        ⚠️ 踩过的坑(2026-09): 这里以前"frame 就是 world"时返回扁平 4 元组、
+        走 TF 时直接返回 ``_compose`` 的**嵌套** ``((x,y,z), quat)``。场地几何
+        的 frame 是 ``world``, 一直走扁平分支所以看着没事; 工件一被 attach,
+        frame 变成 ``dummy_tcp`` 就走了嵌套分支, ``_same_pose`` 里
+        ``abs(float - tuple)`` 抛 TypeError **把镜像节点打死**。表现是
+        "RViz 里工件抓进料盒了, Gazebo 里的工件一直躺在工位上"。
+        """
         if frame_id in ("world", ""):
             return (pos[0], pos[1], pos[2], quat)
         try:
@@ -226,7 +259,8 @@ class GazeboSceneMirror(Node):
             return None
         t = tf.transform.translation
         q = tf.transform.rotation
-        return _compose((t.x, t.y, t.z), (q.x, q.y, q.z, q.w), pos, quat)
+        p, qq = _compose((t.x, t.y, t.z), (q.x, q.y, q.z, q.w), pos, quat)
+        return (p[0], p[1], p[2], qq)
 
     # ---------- 轮询 + 差分同步 ----------
     def _tick(self) -> None:
@@ -251,13 +285,28 @@ class GazeboSceneMirror(Node):
             self._scene_future = self._scene_cli.call_async(
                 GetPlanningScene.Request())
             return
-        self._sync()
+        # 同步出错不能让镜像节点整个死掉 —— 这是个显示层, 死了以后 Gazebo 里
+        # 的工件就再也不会跟着机械臂走, 而且只在"某个几何出问题"时才复现。
+        try:
+            self._sync()
+        except Exception as exc:
+            self.get_logger().warn(
+                f"同步 Gazebo 场景失败(镜像继续跑): {exc}",
+                throttle_duration_sec=5.0)
 
     def _sync(self) -> None:
         for name in [n for n in self._live if n not in self._target]:
+            if self._keep_removed and name.startswith(self._keep_prefix):
+                # 工件已入库 -> 冻结在最后位姿, 别从画面里删掉
+                if name not in self._frozen:
+                    self._frozen.add(name)
+                    self.get_logger().info(
+                        f"{name} 已从规划场景移除(工件入盒), 冻结在料盒里的最后位姿")
+                continue
             self._delete(name)
 
         for name, item in self._target.items():
+            self._frozen.discard(name)
             if name not in self._live:
                 self._spawn(item)
             elif self._live[name] != item.key:

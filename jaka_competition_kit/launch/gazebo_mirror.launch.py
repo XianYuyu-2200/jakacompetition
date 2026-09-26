@@ -17,6 +17,11 @@ launch configuration** —— 同名的话 ``world:=gazebo`` 会把这里的 wor
    默认 collision=false, Gazebo 里的场地几何只是视觉, 不参与物理,
    免得机械臂被静态几何顶住、轨迹跟踪变差。
 
+工件放进料盒后, 判分侧会把它从规划场景里**移除**(`Scene.release_into_bin`:
+已入库, 不再参与碰撞与规划)。这个 launch 默认把这些工件**冻结在最后位姿**
+留在 Gazebo 里(`keep_removed:=true`), 否则料盒在画面里永远是空的 ——
+"抓了 6 件"在 Gazebo 里看不出来。
+
 配合 demo_gazebo.launch.py 使用(round.launch.py world:=gazebo 会自动带上)。
 """
 from launch import LaunchDescription
@@ -54,6 +59,8 @@ def generate_launch_description():
             "collision": LaunchConfiguration("collision"),
             "update_rate": LaunchConfiguration("update_rate"),
             "entity_prefix": LaunchConfiguration("entity_prefix"),
+            "keep_removed": LaunchConfiguration("keep_removed"),
+            "keep_removed_prefix": LaunchConfiguration("keep_removed_prefix"),
         }],
     )
 
@@ -65,5 +72,11 @@ def generate_launch_description():
         DeclareLaunchArgument("update_rate", default_value="10.0"),
         DeclareLaunchArgument("entity_prefix", default_value="",
                               description="给 Gazebo 实体名加统一前缀, 避免重名"),
+        DeclareLaunchArgument(
+            "keep_removed", default_value="true",
+            description="工件入盒后会从规划场景里移除; true = 冻结在 Gazebo 画面里"
+                        "(否则料盒看着永远是空的), false = 跟着删掉"),
+        DeclareLaunchArgument("keep_removed_prefix", default_value="wp",
+                              description="只对这几个前缀的实体做上面的冻结"),
         bridge, mirror,
     ])

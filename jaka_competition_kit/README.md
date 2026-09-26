@@ -81,7 +81,7 @@ ros2 launch jaka_competition_kit gazebo_mirror.launch.py
 | `backend` | MoveIt 动作客户端。仿真/真机同一接口 |
 | `gripper` | 夹爪抽象:`SimGripper`(仿真, 发 `/gripper_controller/commands`) / `WheeltecGripper`(真机串口) / `MockGripper` / `JakaIOGripper` |
 | `executor` | 抓取原语 + 事件上报(队伍直接用这个) |
-| `gz_scene` | 把 MoveIt 规划场景镜像进 Gazebo(可选显示层, 不参与判分) |
+| `gz_scene` | 把 MoveIt 规划场景镜像进 Gazebo(可选显示层, 不参与判分; 工件跟着夹爪走, 入盒后冻结在画面里) |
 | `scene_generator` | 出题节点 |
 | `scorer` | 自动计时判分节点 |
 | `ref_track1` / `ref_track2` | 官方参考实现 |
