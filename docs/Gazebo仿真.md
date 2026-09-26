@@ -259,6 +259,10 @@ import -window <wid> shot.png
 # 一键: 真物理 + 赛场镜像 + 判分侧
 ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 world:=gazebo
 
+# 上一轮没退干净 / 想重开一轮: 先清场(顺带清 FastRTPS 共享内存段)
+bash setup/sim-clean.sh
+bash setup/sim-clean.sh --all    # 再狠一点: 所有 ros2 / ign / rviz 进程
+
 # 或者: 正在跑 demo_gazebo / round.launch.py 时, 单独补一个镜像
 ros2 launch jaka_competition_kit gazebo_mirror.launch.py
 
@@ -289,6 +293,33 @@ ign service -s /gui/move_to --reqtype ignition.msgs.StringMsg \
 实测踩过的坑: Gazebo 的滚轮缩放是**围着鼠标光标**缩的。光标没落在赛场上时,
 连缩几下镜头就一路飘到地面里去了, 看起来像"画面卡住不动"(其实是全屏都是地面)。
 要么先用中键把赛场拖到视口中央再缩, 要么直接跑上面那条 `move_to` 复位。
+
+### 5.1 一次只能跑一套仿真
+
+`ros2 launch` **跑完一轮不会自己退**, 而 `round.launch.py` 的节点名是固定的
+(`/controller_manager`、`/robot_state_publisher`、`move_group`、`ign gazebo`)。
+上一套还在跑时再起一套:
+
+| 你看到的 | 真正原因 |
+|---|---|
+| `spawner: Failed to configure controller` | 第二套的 spawner 连到了第一套的 controller_manager |
+| `rviz2 ... exit code -11` | 两个 rviz 抢同一份 TF / 话题 |
+| Gazebo 黑屏 / 拖不动 | 两个 `ign gazebo` 抢同一套 world 与渲染 |
+
+35 秒内整套崩掉, 看起来非常像"命令写错了"。**实测同一台机器、同一条命令:
+干净环境一次过 `100.0 / 6-of-6 / 49.0s`; 带着上一套起就必崩。**
+
+```bash
+bash setup/sim-clean.sh          # 清场
+bash setup/sim-clean.sh --all    # 所有 ros2 / ign / rviz 进程
+```
+
+`round.launch.py` 启动前会自动查一遍, 撞上就报错并提示上面这条命令;
+确实要两套并存(对照调试)加 `allow_concurrent:=true`。
+
+> 顺带澄清: `ros2_control_node ... LibraryLoadException` 和三个 spawner
+> 秒退那几条**是无害噪音**(见 `setup/README.md` 第 1 条)。判据是
+> `ros2 control list_controllers` 里两个控制器为 `active`。
 
 ## 6. 建议
 

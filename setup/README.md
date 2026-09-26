@@ -13,7 +13,11 @@ bash setup/build.sh                 # 3. 编译
 ```bash
 bash setup/run-rviz-sim.sh     # 纯 RViz 仿真(假硬件, 无需 Gazebo)
 bash setup/run-gazebo-sim.sh   # Gazebo 物理仿真
+bash setup/sim-clean.sh        # 上一轮没退干净 / 想重开一轮时先跑这个
 ```
+
+> `ros2 launch` **不会在一轮跑完后自己退**。留着上一套再起一套, 第二套会在
+> `Failed to configure controller` 之后崩掉, 看着却像命令写错了 —— 见下面第 7 条。
 
 想让 Gazebo 真的走独显(默认的远程桌面会话用不了独显, 见下面第 6 条):
 
@@ -75,6 +79,9 @@ python3 setup/gazebo-viewer.py --from :0 --title Gazebo --crop 578x797+0+48
 进程里存在,于是它会抛 `LibraryLoadException` 并打印一长串堆栈。
 **这是无害的**,真正干活的 Gazebo 内插件工作正常。想去掉噪音,可在
 `jaka_ros2/launches.py` 的 `generate_gazebo_launch()` 里删掉那个 node。
+**判据**:只要 `ros2 control list_controllers` 里
+`jaka_minicobo_controller` / `joint_state_broadcaster` 是 `active`, 这一套
+就是好的, 上面那些 `LibraryLoadException` 和 spawner 秒退都可以无视。
 
 **2. `ign_ros2_control` 已改名 `gz_ros2_control`。**
 Gazebo 日志里会有 deprecation 提示,不影响运行。若想干净,把
@@ -103,3 +110,20 @@ X server, NVIDIA 的 GLX 客户端库驱动不了它。强行设
 `__GLX_VENDOR_LIBRARY_NAME=nvidia` 会让 `glxinfo` 改口报 NVIDIA, 但
 **所有 GL 窗口(含 Gazebo 的 3D 视口)全黑**。要用独显就
 `bash setup/xorg-gpu.sh start`, 详见 `docs/Gazebo仿真.md` 第 4 节。
+
+**7. `ros2 launch` 跑完不会自己退, 两套仿真并存必崩。**
+`round.launch.py` / `demo_gazebo.launch.py` 起的节点名是固定的
+(`/controller_manager`、`/robot_state_publisher`、`move_group`、`ign gazebo`)。
+上一套还活着时再起一套, 第二套的 spawner 会连到**第一套的** controller_manager
+上, 报 `Failed to configure controller`, 随后 rviz2 段错误(`exit code -11`)、
+move_group 段错误、Gazebo 退出 —— 35 秒内整套崩掉, 现象非常像"命令写错了"。
+**实测同一台机器、同一条命令: 干净环境一次过 `100.0 / 6-of-6 / 49.0s`,
+带着上一套起就必崩。**
+
+```bash
+bash setup/sim-clean.sh          # 清场(顺带清 FastRTPS 共享内存段)
+bash setup/sim-clean.sh --all    # 再狠一点: 所有 ros2 / ign / rviz 进程
+```
+
+`round.launch.py` 现在带**启动前检查**: 撞上还在跑的仿真直接报错并提示上面这条
+命令; 确实要两套并存(对照调试)加 `allow_concurrent:=true`。

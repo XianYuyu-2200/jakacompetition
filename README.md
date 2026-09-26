@@ -56,6 +56,10 @@ ros2 launch jaka_competition_kit competition_rviz.launch.py
 ros2 launch jaka_competition_kit round.launch.py track:=1 seed:=246135 vel_scale:=1.0
 ```
 
+> `ros2 launch` 跑完一轮**不会自己退**; 上一套还在时再起一套会互相抢同名节点
+> (`Failed to configure controller` 之后 rviz/move_group 接连崩)。重开前先
+> `bash setup/sim-clean.sh`。详见 `setup/README.md` 第 7 条。
+
 详见 `jaka_competition_kit/README.md`(仿真)与 `docs/真机部署.md`(决赛真机)。
 
 ### 想用 Gazebo 出画面?
@@ -163,7 +167,7 @@ python3 verification/moveit_plan_exec.py 0.4,0.9,-1.1,0,1.0,0.6
 以及两者不一致的地方。
 
 **setup/** — 环境搭建脚本,以及踩坑说明。**重点看 `setup/README.md`**,
-里面记录了 5 个会让仿真直接跑不起来的问题。
+里面记录了 7 个会让仿真直接跑不起来的问题。
 
 **verification/** — 验证脚本(URDF/FK 交叉验证、MoveIt 规划执行、姿态发布、
 抓屏转 PNG)和实测截图。

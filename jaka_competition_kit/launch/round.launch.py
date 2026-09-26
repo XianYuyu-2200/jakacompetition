@@ -36,7 +36,15 @@ JAKA 580mm 臂展 + 164.6mm 长的手指, 工位4/6(r=385mm)的**预抓取悬停
 挑关节解翻腕), 转场走 L 形(先抬 -> 沿半径朝基座内收 -> 再抬, 见
 `Executor.pick_and_place`)。逐点数字见 `ros2 run jaka_competition_kit arena_check`
 和 docs/WHEELTEC柔性机械爪.md 第 4 节。
+
+`ros2 launch` **跑完一轮不会自己退**。本 launch 的节点名是固定的, 上一套还活着
+时再起一套, 第二套的 spawner 会连到第一套的 /controller_manager 上, 报
+"Failed to configure controller" 然后 rviz2 / move_group 接连段错误 —— 看着
+像命令写错了, 其实是两套在抢。所以启动前会先查一遍, 撞上就直接报错让你去跑
+`bash setup/sim-clean.sh`(确实要并存就加 `allow_concurrent:=true`)。
 """
+import os
+
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
                             OpaqueFunction)
@@ -46,6 +54,62 @@ from launch.substitutions import (EnvironmentVariable, LaunchConfiguration,
                                   PathJoinSubstitution, PythonExpression)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+
+# 只有比赛仿真栈才有的标记 —— 别把 `ros2 run jaka_competition_kit arena_check`
+# 这类一次性工具也算成"已经在跑"(它们的可执行文件名不一样)。
+_GUARD_MARKERS = (
+    "jaka_competition_kit/scorer",
+    "jaka_competition_kit/scene_generator",
+    "ign gazebo",
+)
+
+
+def _pids_with_marker(markers):
+    """扫 /proc 找命令行里带任一 marker 的进程, 排除自己这条父进程链。"""
+    chain, pid = set(), os.getpid()
+    while pid > 1 and pid not in chain:
+        chain.add(pid)
+        try:
+            with open(f"/proc/{pid}/status", encoding="utf-8") as fh:
+                ppid = next((int(l.split()[1]) for l in fh
+                             if l.startswith("PPid:")), 0)
+        except OSError:
+            break
+        pid = ppid
+    hits = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit() or int(entry) in chain:
+            continue
+        try:
+            with open(f"/proc/{entry}/cmdline", "rb") as fh:
+                cmd = fh.read().replace(b"\0", b" ").decode("utf-8", "replace")
+        except OSError:
+            continue
+        if any(m in cmd for m in markers):
+            hits.append((int(entry), cmd.strip()))
+    return hits
+
+
+def _guard_no_concurrent(context):
+    """已经有仿真在跑就别再起一套, 直接报错说清怎么办。"""
+    if LaunchConfiguration("allow_concurrent").perform(context).strip().lower() \
+            in ("1", "true", "yes", "on"):
+        return []
+    hits = _pids_with_marker(_GUARD_MARKERS)
+    if not hits:
+        return []
+    listed = "\n".join(f"    pid {p}: {c[:90]}" for p, c in hits[:5])
+    more = f"\n    ... 还有 {len(hits) - 5} 个" if len(hits) > 5 else ""
+    raise RuntimeError(
+        "已经有一套比赛仿真在跑了, 不能再起第二套 —— 同名节点"
+        "(/controller_manager, /robot_state_publisher, ign gazebo)会互相抢,\n"
+        "新起的这套会在 'Failed to configure controller' 之后崩掉, "
+        "报错看着却像命令写错了。\n"
+        f"{listed}{more}\n"
+        "  先停掉上一套:  bash setup/sim-clean.sh\n"
+        "  确实要两套并存: 加 allow_concurrent:=true"
+    )
 
 
 def _sim_stack(context):
@@ -128,6 +192,9 @@ def generate_launch_description():
                 "'true' if '", EnvironmentVariable("JAKA_GRIPPER", default_value="0"),
                 "'.strip().lower() in ('1', 'true', 'yes', 'on') else 'false'"]),
             description="是否起夹爪控制器(末端装了 WHEELTEC 夹爪就跟着 JAKA_GRIPPER)"),
+        DeclareLaunchArgument(
+            "allow_concurrent", default_value="false",
+            description="已经有仿真在跑时也允许再起一套(默认 false, 会直接报错)"),
         DeclareLaunchArgument("world", default_value="rviz",
                               description="rviz=假硬件 / gazebo=真物理+赛场镜像"),
         DeclareLaunchArgument("track", default_value="1"),
@@ -137,5 +204,8 @@ def generate_launch_description():
         DeclareLaunchArgument("run_reference", default_value="true"),
         DeclareLaunchArgument("vel_scale", default_value="0.5"),
         DeclareLaunchArgument("gripper", default_value="sim"),
+        # 冲突检查必须排在最前 —— launch 按顺序执行, 排在后面的话
+        # Node/IncludeLaunchDescription 已经把进程起起来了。
+        OpaqueFunction(function=_guard_no_concurrent),
         sim, gripper_ctl, judge, reference,
     ])

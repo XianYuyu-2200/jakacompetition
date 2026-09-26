@@ -46,6 +46,11 @@ Gazebo 那条线默认是**空世界**, 赛场几何不会自己出现 —— �
 场景里, Gazebo 不认识。`world:=gazebo` 会顺带起 `gazebo_mirror.launch.py`,
 把规划场景逐个镜像成 Gazebo 模型(工件夹起来时会跟着夹爪走)。
 
+> ⚠️ `ros2 launch` 跑完一轮**不会自己退**。上一套还在跑时再起一套, 第二套会
+> 卡在 `Failed to configure controller`, 接着 rviz2 / move_group 段错误, 很像
+> "命令写错了"。重开一轮前先清场 `bash setup/sim-clean.sh`; launch 自带冲突
+> 检查会直接拦住并提示, 确实要并存加 `allow_concurrent:=true`。
+
 单独补一个镜像(比如你已经在跑 `demo_gazebo.launch.py`):
 
 ```bash
