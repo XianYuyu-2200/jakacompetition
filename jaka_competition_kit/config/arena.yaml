@@ -41,10 +41,14 @@ tool:
   #
   # ⚠ 可达性: wheeltec 的 164.6mm 刀尖把抓取高度抬到 173.6mm, 预抓取悬停
   #   (再 +35mm)到 208.6mm, 而 580mm 臂展的机械臂在 r=385mm 处工具朝下最多只到
-  #   195.9mm(见 Arena.max_tcp_z)。实测: 工位 1/2/3/5 全流程正常;
-  #   **工位4/6(r=385mm)的抓取与预抓取都能完成, 但夹起工件后抬到转场高度
-  #   (232.6mm)规划失败** —— 这两个工位的工件进不了料盒。
-  #   跑 `ros2 run jaka_competition_kit arena_check` 会逐点报出来。
+  #   195.9mm(见 Arena.max_tcp_z)。工位4/6 的**预抓取悬停**和"原地竖直抬到
+  #   转场高度(232.6mm)"都超了。参考实现不用改布局就能绕开:
+  #     * 悬停压到该半径上限(clamp_tcp_z) —— 够不到位姿会让 IK 无解, 规划器
+  #       于是随机挑关节解(实测挑到 J4/J6 翻 180° 的腕部另一支, 整轮翻腕);
+  #     * 转场走 L 形: 先原地抬到上限 -> 沿半径朝基座内收 -> 再抬到转场高度
+  #       (见 reach_pull_margin 与 Executor.pick_and_place)。
+  #   实测柔性爪跑完整轮赛道一 6/6、顺序正确、69.6s、100.0 分。
+  #   跑 `ros2 run jaka_competition_kit arena_check` 会逐点报出这些高度;
   #   详见 docs/WHEELTEC柔性机械爪.md 第 4 节。
   gripper: none
   # TCP(法兰面)往下假想的末端高度 —— 只有 gripper: none 时用。
@@ -74,6 +78,11 @@ tool:
   jaw_gap_extra: 0.004
   # 预抓取点比抓取点再抬高多少
   approach_lift: 0.035
+  # L 形转场(长末端在远端工位原地竖直抬不到转场高度时, 先抬到该半径上限 ->
+  # 沿半径朝基座内收 -> 再抬起来; 见 Executor.pick_and_place)留的安全余量。
+  # 内收目标半径按 radius_for_tcp_z(转场高度 + 本值) 反算 —— 留 10mm 是为了让
+  # 内收终点本身还有 10mm 高度余量, 免得刚好卡在可达边界上规划不出来。
+  reach_pull_margin: 0.010
   # 料盒底板厚度(工件要落在它上面)
   bin_floor: 0.008
   # 释放时工件底面离料盒底板的最小间隙。

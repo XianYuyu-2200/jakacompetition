@@ -28,10 +28,14 @@
       world:=gazebo track:=1
 
 这一个环境变量同时切三处: URDF 里的夹爪模型(with_gripper)、arena.yaml 的
-抓取/转场/投放高度(tool.gripper)、夹爪控制器(use_gripper)。**但注意**:
+抓取/转场/投放高度(tool.gripper)、夹爪控制器(use_gripper)。
+
 JAKA 580mm 臂展 + 164.6mm 长的手指, 工位4/6(r=385mm)的**预抓取悬停点**
-(抓取点 +35mm)会超出可达上限 12.7mm(逐点数字见
-`ros2 run jaka_competition_kit arena_check` 和 docs/WHEELTEC柔性机械爪.md 第 4 节)。
+(208.6mm)和**原地竖直抬到转场高度**(232.6mm)都超出该半径的可达上限
+195.9mm。参考实现不用改布局就能绕开: 悬停压到上限(保证 IK 有解 -> 不会随机
+挑关节解翻腕), 转场走 L 形(先抬 -> 沿半径朝基座内收 -> 再抬, 见
+`Executor.pick_and_place`)。逐点数字见 `ros2 run jaka_competition_kit arena_check`
+和 docs/WHEELTEC柔性机械爪.md 第 4 节。
 """
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,

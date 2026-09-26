@@ -142,6 +142,12 @@ class ReferenceBase(rclpy.node.Node):
                     bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"])
                 if good:
                     break
+                if self.arm.last_failure == "unreachable":
+                    # 几何够不到(见 docs/WHEELTEC柔性机械爪.md 第 4 节): 重试 3 次
+                    # 只是把同一段几何再算 3 遍。确定性失败就不要假装能重试成功。
+                    self.get_logger().warn(
+                        "    几何不可达, 不重试: 换短末端或按文档第 4 节的方案调布局")
+                    break
                 self.get_logger().warn(f"    第 {attempt + 1} 次失败, 复位后重试")
             self.get_logger().info(
                 f"    {'成功' if good else '失败'} (累计 {time.time() - t0:.1f}s)")

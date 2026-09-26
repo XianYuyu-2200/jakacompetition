@@ -191,6 +191,11 @@ class Arena:
     def approach_lift(self) -> float:
         return float(self.raw["tool"]["approach_lift"])
 
+    @property
+    def reach_pull_margin(self) -> float:
+        """L 形转场"内收"时给可达上限留的余量(见 ``Executor.pick_and_place``)。"""
+        return float(self.raw["tool"].get("reach_pull_margin", 0.010))
+
     # ---- 机械臂可达性 ----
     # 目标位姿"规划不出来"时, 先分清是**撞了**还是**根本到不了**: MoveIt 两种
     # 情况都只回一个 error_code=99999(FAILURE), 光看返回值分不出来。
@@ -241,9 +246,46 @@ class Arena:
         return (self.shoulder_z - self.wrist_len
                 + math.sqrt(self.reach_radius ** 2 - r * r))
 
+    def radius_for_tcp_z(self, z: float, margin: float = 0.0) -> float:
+        """``max_tcp_z`` 的反函数: 想站到高度 ``z``, 水平半径最大能放到多少。
+
+        ``z_max(r) = 27.7 + sqrt(R² - r²)``  =>  ``r_max(z) = sqrt(R² - (z + w - h)²)``
+        (R = 大臂+小臂, w = wrist_len, h = shoulder_z)。够不到返回 nan。
+        用途: 长末端竖直抬不到转场高度时, 算"往基座收多少才抬得起来"(见 Executor)。
+        """
+        dy = z + self.wrist_len - self.shoulder_z + margin
+        R = self.reach_radius
+        if abs(dy) > R:
+            return float("nan")
+        return math.sqrt(R * R - dy * dy)
+
     def reach_ok(self, r: float, z: float, margin: float = 0.0) -> bool:
         top = self.max_tcp_z(r)
         return (not math.isnan(top)) and z <= top - margin
+
+    def reach_top_z(self, x: float, y: float, margin: float = 0.0) -> float:
+        """``(x, y)`` 处 TCP 能到的最高高度(可再留 ``margin``)。够不到返回 nan。"""
+        top = self.max_tcp_z(math.hypot(x, y))
+        return top if math.isnan(top) else top - margin
+
+    def clamp_tcp_z(self, x: float, y: float, z: float,
+                    margin: float = 0.005) -> Tuple[float, bool]:
+        """把 TCP 目标高度压进可达范围内 -> ``(z, 是否被压过)``。
+
+        为什么要压而不是直接放过: ``max_tcp_z`` 只是**必要条件**, 真到不了的时候
+        ``/compute_ik`` 直接返回无解, 而参考实现此时会退化成"只给位姿目标"的兜底
+        模式 —— 规划器于是**随机挑**一组关节解(实测挑到了 J4/J6 翻 180° 的腕部
+        另一支), 之后整轮都在翻腕, 看起来就是"解算很奇怪"。
+
+        压到"该半径够得到的最高点"之后 IK 一定有解, "最近关节角分支"这条工业做法
+        才真正生效 —— 动作确定、不翻腕。预抓取悬停本来就是个余量, 压掉几毫米
+        不影响抓取; 但**转场高度不能只压不报**, 压了就意味着手里的工件会撞到东西,
+        调用方要拿 ``clamped`` 去告警(见 ``Executor.pick_and_place``)。
+        """
+        top = self.reach_top_z(x, y, margin)
+        if math.isnan(top):
+            return z, False
+        return (z, False) if z <= top else (top, True)
 
     def reach_rows(self) -> List[Tuple[str, float, float, float, bool]]:
         """末端必须到的高度逐点校核 -> (名称, r, z, 该半径上限, 是否可达)。
@@ -372,6 +414,11 @@ class Arena:
         "抬够" 和 "抬得高" 是反直觉的: **抬不够才真的抬得高**。
 
         间隙可在 ``arena.yaml`` 的 ``tool.transfer_margin`` 里调(默认 10mm)。
+
+        注意本函数只给出"该到多高", 并**不假设一步竖直抬得上去** —— 长末端在
+        远端工位原地抬不到这个高度时, ``Executor.pick_and_place`` 会改走
+        L 形(先抬到该半径上限 -> 沿半径朝基座内收 -> 再抬到本高度, 见
+        ``radius_for_tcp_z``)。
         """
         margin = float(self.raw["tool"].get("transfer_margin", 0.010))
         obs = max(self.bin_top_z(bin_box), self.source_area_top_z(bin_box))

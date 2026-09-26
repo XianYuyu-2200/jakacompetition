@@ -15,6 +15,7 @@ scorer 不信任这些声明本身:抓取点必须落在该工件真值附近,�
 from __future__ import annotations
 
 import json
+import math
 import time
 from typing import Dict, Optional, Sequence, Tuple
 
@@ -52,6 +53,9 @@ class Executor:
         self._tf_listener = TransformListener(self._tf_buffer, node)
         self.tcp_xyz: Tuple[float, float, float] = (0.0, 0.0, self.pre_grasp_z)
         self.quat = arena.tool_down_quat
+        # 上一次 pick_and_place 为什么失败: "" = 成功 / "unreachable"(几何够不到,
+        # 重试没有意义) / "motion"(规划或执行失败, 值得重试)
+        self.last_failure = ""
 
     # ---------- 事件 ----------
     def emit(self, event: str, object_id: str = "", detail: str = "",
@@ -244,28 +248,98 @@ class Executor:
         #         越过料盒侧墙和旁边工件的顶面, 否则规划器会绕出一条大弧
         #         (实测末端从 135mm 拱到 354mm)。见 Arena.transfer_tcp_z()。
         tz = self.arena.transfer_tcp_z(grasp_tcp_z, size, bin_box)
+
+        # ---- 可达性预检: 够不到的位姿**不发指令** ----
+        # 悬停高度只是个余量, 压到该半径够得到的最高点即可(IK 一定有解,
+        # "最近关节角分支"才会生效; 直接下发够不到的位姿会让规划器随机挑解,
+        # 实测挑到 J4/J6 翻 180° 的腕部另一支, 之后整轮都在翻腕)。
+        self.last_failure = ""
+        az_want = az
+        az, az_clamped = self.arena.clamp_tcp_z(x, y, az)
+        if az_clamped:
+            self.node.get_logger().warn(
+                f"工位({x:.3f},{y:.3f}) 预抓取悬停 {az_want * 1000:.1f}mm 超出该半径上限"
+                f" {self.arena.reach_top_z(x, y) * 1000:.1f}mm, 压到 {az * 1000:.1f}mm"
+                f"(够不到的位姿 IK 无解 -> 规划器随机挑关节解 -> 翻腕)")
+        # ---- L 形转场: 竖直抬不到转场高度时, 先"抬到该半径上限 -> 内收 -> 再抬" ----
+        # 长末端(指尖比臂展还占地方)在远端工位会遇到"原地竖直抬不到 tz"。这不是
+        # 死路: ``z_max`` 只跟**半径**有关, 往基座收 20mm 就能多抬 40mm。关键是
+        # 这一段水平移动发生在**还没抬够高度**的时候, 只能朝基座方向走 —— 邻件都在
+        # 同一圈上, 沿半径内收不会经过它们; 一旦抬到 tz, 工件底面已高过全场最高的
+        # 工件, 再横穿赛场就安全了。
+        tz_top = self.arena.reach_top_z(x, y)
+        pull = None                       # (x, y, z): 内收路点
+        if not math.isnan(tz_top) and tz > tz_top:
+            r = math.hypot(x, y)
+            r_need = self.arena.radius_for_tcp_z(tz + self.arena.reach_pull_margin)
+            if math.isnan(r_need) or r_need >= r:
+                self.node.get_logger().error(
+                    f"工位({x:.3f},{y:.3f}) r={r * 1000:.0f}mm 够不到转场高度 "
+                    f"{tz * 1000:.1f}mm(该半径上限 {tz_top * 1000:.1f}mm): 末端竖直向下时 "
+                    f"工件挂深 {self.arena.grasp_offset(size) * 1000 + size * 1000:.1f}mm"
+                    f"(指尖深 {self.arena.tip_depth * 1000:.1f}mm), 收到基座附近也抬不起来 "
+                    f"—— 跳过本件(见 docs/WHEELTEC柔性机械爪.md 第 4 节)")
+                self.node.get_logger().error(
+                    f"运动失败 lift ({x:.3f},{y:.3f},{tz:.3f}) -> 几何不可达")
+                self.last_failure = "unreachable"
+                return False
+            f = r_need / r
+            pull = (x * f, y * f, tz_top)
+            self.node.get_logger().warn(
+                f"工位({x:.3f},{y:.3f}) r={r * 1000:.0f}mm 原地抬不到转场高度 "
+                f"{tz * 1000:.1f}mm(上限 {tz_top * 1000:.1f}mm), 改走 L 形转场: "
+                f"抬到 {tz_top * 1000:.1f}mm -> 沿半径内收到 r={r_need * 1000:.0f}mm -> "
+                f"再抬到 {tz * 1000:.1f}mm")
+        if not self.arena.reach_ok(math.hypot(x, y), grasp_tcp_z):
+            self.node.get_logger().error(
+                f"工位({x:.3f},{y:.3f}) 抓取高度 {grasp_tcp_z * 1000:.1f}mm 超出该半径上限 "
+                f"{self.arena.max_tcp_z(math.hypot(x, y)) * 1000:.1f}mm —— 跳过本件")
+            self.last_failure = "unreachable"
+            return False
+
         # 工件原始底面高度: 复位时按它放回原位
         z_bottom = object_center_z - size / 2.0
         back = (x, y, z_bottom, size)
         if not self.approach(x, y, az).ok:
+            self.last_failure = "motion"
             self.recover()
             return False
         # 下降和抬起对称, 也走笛卡尔直线: 关节空间规划在手腕奇异附近可能
         # 换 IK 分支, 末端划一道弧线出来(工件蹭到邻居 / 工位板)。
         if not self._move(x, y, grasp_tcp_z, "descend", straight=True).ok:
+            self.last_failure = "motion"
             self.recover()
             return False
         if not self.grasp(object_id, size, (x, y, object_center_z)):
+            self.last_failure = "motion"
             self.recover()
             return False
-        if not self._move(x, y, tz, "lift", straight=True).ok:
-            self.recover(object_id, back)
-            return False
+        # 抬升: 够得到就一步竖直抬到转场高度; 长末端够不到就走 L 形三段。
+        if pull is None:
+            if not self._move(x, y, tz, "lift", straight=True).ok:
+                self.last_failure = "motion"
+                self.recover(object_id, back)
+                return False
+        else:
+            if not self._move(x, y, pull[2], "lift", straight=True).ok:
+                self.last_failure = "motion"
+                self.recover(object_id, back)
+                return False
+            if not self._move(pull[0], pull[1], pull[2], "pull", straight=True).ok:
+                self.last_failure = "motion"
+                self.recover(object_id, back)
+                return False
+            if not self._move(pull[0], pull[1], tz, "lift2", straight=True).ok:
+                self.last_failure = "motion"
+                self.recover(object_id, back)
+                return False
         if not self.go_to_bin(bin_box, tz).ok:
+            self.last_failure = "motion"
             self.recover(object_id, back)
             return False
         if not self._move(bin_box.center[0], bin_box.center[1], release_z,
                           "place", straight=True).ok:
+            self.last_failure = "motion"
             self.recover(object_id, back)
             return False
         self.release(object_id, bin_box)

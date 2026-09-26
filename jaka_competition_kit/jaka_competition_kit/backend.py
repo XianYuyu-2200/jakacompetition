@@ -484,6 +484,19 @@ class MoveGroupBackend:
                 self.node.get_logger().warn(
                     f"[ik] {len(cands)} 支候选解都规划失败 —— 退回位姿目标"
                     f"(规划器会随机挑解, 这一步可能绕路)")
+            else:
+                # 一个候选解都没有 = /compute_ik 对所有种子都无解, 基本只有一个
+                # 原因: 目标点在这个半径上太高(见 Arena.max_tcp_z)。必须说清楚,
+                # 因为**退化成位姿目标之后规划器会随机挑一组关节解** —— 实测挑到
+                # J4/J6 翻 180° 的腕部另一支, 之后整轮都在翻腕, 看起来就是
+                # "抓取放置的解算很奇怪"。正确做法是调用方先把目标压进可达范围
+                # (Executor 用 Arena.clamp_tcp_z 做这件事)。
+                r = math.hypot(float(position[0]), float(position[1]))
+                self.node.get_logger().warn(
+                    f"[ik] 目标 ({position[0]:.3f},{position[1]:.3f},{position[2]:.3f}) "
+                    f"r={r * 1000:.0f}mm 对全部种子都无逆解 —— 目标多半超出了该半径的"
+                    f"可达上限(用 Arena.max_tcp_z(r) / arena_check 核对); "
+                    f"现退回位姿目标, 规划器会**随机挑**关节解(实测会翻腕)")
 
         t0 = time.time()
         return self._run(self._goal(position, quat, plan_only), t0, "pose")
