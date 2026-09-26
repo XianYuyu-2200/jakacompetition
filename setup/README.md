@@ -28,6 +28,9 @@ bash setup/xorg-gpu.sh stop :0
 
 ```bash
 bash setup/xorg-viewer.sh start    # VNC: 可拖拽操作, 只监听本机, 免 sudo
+bash setup/xorg-viewer.sh fill     # Gazebo 起晚了就用这条把它铺满置顶
+bash setup/xorg-viewer.sh view     # 查看窗口拖不动(卡在弹菜单状态)时重开它
+bash setup/xorg-viewer.sh cam table  # 相机跑飞了, 把 Gazebo 机位对回赛场
 bash setup/xorg-viewer.sh stop
 
 # 或者只读转发(不装任何东西, 约 5 fps):

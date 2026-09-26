@@ -15,6 +15,7 @@
 #   docs/JAKA-Mini2-参数速查.md     官方参数 vs URDF 实测
 #   docs/真机部署.md                决赛真机部署指南
 #   docs/Gazebo仿真.md              Gazebo 显示层(可选)的开关与坑
+#   docs/WHEELTEC柔性机械爪.md       末端柔性爪的 STEP→URDF、驱动与可达性结论
 #   dual_arm_demo/ROLES.md         双臂演示的角色说明
 #   extras_linkerhand/doc/Topic-Reference.md
 #   jaka_ros2/jaka_ros2_documentation.md
@@ -27,6 +28,7 @@
 !docs/JAKA-Mini2-参数速查.md
 !docs/真机部署.md
 !docs/Gazebo仿真.md
+!docs/WHEELTEC柔性机械爪.md
 !dual_arm_demo/ROLES.md
 !extras_linkerhand/doc/Topic-Reference.md
 !jaka_ros2/jaka_ros2_documentation.md

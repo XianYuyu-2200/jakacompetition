@@ -173,12 +173,46 @@ bash setup/xorg-viewer.sh stop       # 用完关掉
 
 - 服务端只听 `127.0.0.1`(`-localhost`), 不对外开端口; 本地回环连接不需要密码;
 - 窗口里就是 `:0` 的桌面, 左键拖=转视角, 中键拖=平移, 滚轮=缩放;
+- **拖不动 / 转不了视角时先看这条**(2026-09 实测过一次): 先分清是 Gazebo 没反应,
+  还是**事件根本没传到 `:0`**。判据: 指针在查看窗口里移来移去, 而
+  `DISPLAY=:0 xdotool getmouselocation` 读到的 `:0` 指针**纹丝不动** —— 那就是查看
+  窗口没转发输入, 跟 Gazebo 无关(当时同时验证: 直接在 `:0` 上合成一次拖拽, 视角是
+  转得动的)。处理顺序: 先在查看窗口内部点一下让它拿到焦点, 再拖; 还不行就重开一个
+  查看窗口 —— `bash setup/xorg-viewer.sh view`(实测重开后立刻恢复转发)。
+  顺带: 滚轮缩放是**围着鼠标光标**缩的, 光标不在赛场上时连缩几下镜头就飘进地面里,
+  画面只剩一片灰, 看起来更像"卡死"; 用 `bash setup/xorg-viewer.sh cam table` 复位机位;
+- **`start` 会顺手把 Gazebo 铺满 `:0` 并置顶**(见下), 没赶上就补一条
+  `bash setup/xorg-viewer.sh fill`;
 - 实测(x11vnc 0.9.16 + gvncviewer 1.3.0, 1920x1080): 两端各占 5~6% CPU,
   画面流畅可交互; 拖拽转视角后 `:0` 侧的 Gazebo 画面确实跟着变;
 - 本机没装这两个包时脚本会自己 `apt-get download` 解到 `~/.local/opt/vnc` ——
   **不需要 sudo**。想装进系统就 `sudo apt install x11vnc tigervnc-viewer`;
+- **卡不卡取决于最后一跳, 不取决于独显**(2026-09 实测): Gazebo 侧确实在独显上
+  跑(`nvidia-smi` 里 `ign gazebo gui` 是 GPU 进程、304MiB 显存, ogre2.log 是
+  NVIDIA, 仿真实时率 100%), 但 `:1001` 本身是 NoMachine 的虚拟 X server, 独显
+  接不上 —— VNC 解码、重绘、gnome-shell 合成、NoMachine 再编码给你本地客户端,
+  这几步全是 CPU。拖动实测: x11vnc 4%、gvncviewer 2%、gnome-shell 36%、
+  转发帧率 ≥19fps, 本机这头没有瓶颈, 所以卡在 NoMachine 那条链路上。
+  想更顺就少传像素: `ZOOM=50 bash setup/xorg-viewer.sh start`(窗口边长减半,
+  要传的像素少到 1/4), 或者别把 Gazebo 铺满(1280x720 就够看);
+- 另外一个"白烧"的地方: GUI 静止时也吃 ~191% CPU —— 无头 Xorg 是
+  `UseDisplayDevice none`, 没有垂直同步, 帧率无上限(窗口 1280x720 和
+  1920x1080 实测都是 191%)。用 `__GL_SYNC_TO_VBLANK=1` 限帧会掉到 2%,
+  但 GUI 就不再出画面了(显存 304MiB→2MiB、渲染日志停更), 所以不能用;
 - 踩过的坑: 本机环境里 `WAYLAND_DISPLAY=no`, x11vnc 会把它当成 Wayland 会话
   直接 `Wayland display server detected. Exiting.` —— 脚本里用 `env -u` 去掉了。
+
+> **"Gazebo 黑屏"是怎么来的(2026-09 复现确认)**: `:0` 上没有窗口管理器, 于是
+> 1) 后启动的 RViz 和 Gazebo 都落在 `(0,0)`, 没人管叠放顺序, 1200x975 的 RViz
+> 把 1000x845 的 Gazebo **整个盖住**; 2) 根窗口是黑的, 窗口又只占屏幕一角, 剩下
+> 一大片就是纯黑。所以在 VNC 窗口里看到的是"一个 RViz + 一片黑", 很容易当成
+> Gazebo 挂了 —— 其实 Gazebo 在底下好好跑着。
+> 解法就是把 Gazebo 拉到 `(0,0)` 铺满并置顶(脚本已自动做):
+>
+> ```bash
+> bash setup/xorg-viewer.sh fill
+> export DISPLAY=:0 && pkill -f moveit.rviz   # 可选: :0 上的 RViz 看不见, 还抢位置
+> ```
 
 **(B) 只读转发 —— 不装任何东西**
 
@@ -243,6 +277,18 @@ ign service -s /gui/move_to/pose --reqtype ignition.msgs.GUICamera \
   --req 'pose: {position: {x: 0.82, y: -0.70, z: 0.52},
                 orientation: {x: -0.170161, y: 0.086650, z: 0.874718, w: 0.445428}}'
 ```
+
+**相机跑飞了(画面只剩一片灰)最省事的救法** —— 不用算四元数, 直接把镜头对到
+某个模型上:
+
+```bash
+ign service -s /gui/move_to --reqtype ignition.msgs.StringMsg \
+  --reptype ignition.msgs.Boolean --timeout 3000 --req 'data: "table"'
+```
+
+实测踩过的坑: Gazebo 的滚轮缩放是**围着鼠标光标**缩的。光标没落在赛场上时,
+连缩几下镜头就一路飘到地面里去了, 看起来像"画面卡住不动"(其实是全屏都是地面)。
+要么先用中键把赛场拖到视口中央再缩, 要么直接跑上面那条 `move_to` 复位。
 
 ## 6. 建议
 

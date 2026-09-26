@@ -8,6 +8,9 @@
 # 用法:
 #   bash setup/xorg-viewer.sh start            # 起 VNC 服务 + 打开查看窗口
 #   bash setup/xorg-viewer.sh start --no-gui   # 只起 VNC 服务(给别的机器连)
+#   bash setup/xorg-viewer.sh fill             # 把 Gazebo 铺满 :0 并置顶
+#   bash setup/xorg-viewer.sh cam [模型名]      # 把 Gazebo 相机对到某个模型(default: table)
+#   bash setup/xorg-viewer.sh view             # 只重开查看窗口(拖不动的时候用这个)
 #   bash setup/xorg-viewer.sh stop
 #
 # 本机没装 x11vnc / gvncviewer 时, 脚本会自己 `apt-get download` 解到
@@ -53,28 +56,92 @@ start_vnc() {
     echo "[OK] x11vnc 已起, 日志 ${LOGFILE}"
 }
 
+# `:0` 上没有窗口管理器, 于是有两件事会让人以为"Gazebo 黑屏":
+#   1) 后启动的 RViz 和 Gazebo 都在 (0,0), 没有 WM 就没人管叠放, RViz 盖住它;
+#   2) 根窗口是黑的, 窗口又只占屏幕一块, 剩下的大片区域就是纯黑。
+# 把 Gazebo 拉到 (0,0) 铺满并置顶, 两个问题一起解决(VNC 里看到的就是 Gazebo)。
+arrange_gazebo() {
+    local wid best="" best_area=0 w h area
+    for wid in $(DISPLAY="${SRC_DISPLAY}" xdotool search --name 'Gazebo' 2>/dev/null); do
+        w=$(DISPLAY="${SRC_DISPLAY}" xwininfo -id "${wid}" 2>/dev/null \
+            | awk '/^  Width/{print $2}')
+        h=$(DISPLAY="${SRC_DISPLAY}" xwininfo -id "${wid}" 2>/dev/null \
+            | awk '/^  Height/{print $2}')
+        [ -n "${w}" ] && [ -n "${h}" ] || continue
+        area=$((w * h))
+        if [ "${area}" -gt "${best_area}" ]; then best_area="${area}"; best="${wid}"; fi
+    done
+    if [ -z "${best}" ]; then
+        echo "[=] ${SRC_DISPLAY} 上还没有 Gazebo 窗口 —— 等 Gazebo 起来后再执行:"
+        echo "    bash setup/xorg-viewer.sh fill"
+        return
+    fi
+    DISPLAY="${SRC_DISPLAY}" xdotool windowmove "${best}" 0 0
+    DISPLAY="${SRC_DISPLAY}" xdotool windowsize "${best}" 100% 100%
+    DISPLAY="${SRC_DISPLAY}" xdotool windowraise "${best}"
+    echo "[OK] 已把 Gazebo(${best})铺满 ${SRC_DISPLAY} 并置顶"
+}
+
 start_gui() {
     echo "[*] 打开查看窗口 (${SRC_DISPLAY} -> ${DISPLAY:-<未设置>}, zoom ${ZOOM}%)"
-    echo "    Gazebo 里: 左键拖=转, 中键拖=平移, 滚轮=缩放; F8 退出全屏"
+    echo "    Gazebo 里: 左键拖=转, 中键拖=平移, 滚轮=缩放"
+    echo "    拖不动就换一个: bash $0 view   (滚轮是围着光标缩的, 缩飞了用 cam 复位)"
     LD_LIBRARY_PATH="${LIBDIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
         "${PREFIX}/usr/bin/gvncviewer" -z "${ZOOM}" "localhost:0"
+}
+
+# 把 Gazebo 的相机对到某个模型上。
+#
+# 为什么需要: gvncviewer 的缩放是"围着鼠标光标"缩的, 光标没落在赛场上时连缩几下
+# 镜头就飘到地面里, 看起来像"画面卡住"; 另外查看窗口偶尔会卡在弹菜单的状态, 那时
+# 鼠标事件根本传不到 :0(实测: 指针在 :0 上纹丝不动), 重启查看窗口即可。
+set_camera() {
+    local target="${1:-table}" cli="" mtype=""
+    if command -v ign >/dev/null 2>&1; then cli=ign; mtype=ignition.msgs.StringMsg
+    elif command -v gz >/dev/null 2>&1; then cli=gz; mtype=gz.msgs.StringMsg
+    else
+        echo "[!] 找不到 ign/gz 命令行 —— 先 source /opt/ros/humble/setup.bash" >&2
+        return 1
+    fi
+    if "${cli}" service -s /gui/move_to --reqtype "${mtype}" \
+            --reptype "${mtype%StringMsg}Boolean" --timeout 3000 \
+            --req "data: \"${target}\"" >/dev/null 2>&1; then
+        echo "[OK] Gazebo 相机已对到 ${target}"
+    else
+        echo "[!] 对到 ${target} 失败 —— Gazebo 起了吗? (ros2 launch ... world:=gazebo)" >&2
+        return 1
+    fi
 }
 
 case "${1:-start}" in
     start)
         ensure_bins
         start_vnc
+        arrange_gazebo
         if [ "${2:-}" = "--no-gui" ]; then
             exit 0
         fi
         start_gui
+        ;;
+    fill)
+        ensure_bins
+        arrange_gazebo
+        ;;
+    view)
+        ensure_bins
+        pkill -f "bin/gvncviewer" 2>/dev/null || true
+        sleep 1
+        start_gui
+        ;;
+    cam)
+        set_camera "${2:-table}"
         ;;
     stop)
         pkill -f "x11vnc -display ${SRC_DISPLAY}" && echo "[OK] x11vnc 已停" || echo "[=] 没有在跑的 x11vnc"
         pkill -f "gvncviewer" && echo "[OK] 查看窗口已关" || true
         ;;
     *)
-        echo "用法: $0 {start [--no-gui]|stop}" >&2
+        echo "用法: $0 {start [--no-gui]|fill|view|cam [模型名]|stop}" >&2
         exit 2
         ;;
 esac
