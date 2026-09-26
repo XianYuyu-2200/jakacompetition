@@ -23,10 +23,20 @@ config/gripper.yaml
 坐标约定(STEP 装配 -> dummy_tcp)
 --------------------------------
     TCP.x =  step.x - 49.35mm          装配对称轴 -> 夹爪中心
-    TCP.y =  step.z - 49.90mm          刀片厚度方向
-    TCP.z = -(step.y + 16.8mm) - 40mm  装配轴(+y=夹爪朝向) -> 工具轴向下(-z)
-40mm 是 Link_6 网格在 dummy_tcp 下方的长度(见 arena.yaml 的 tool.flange_height),
-也就是机械臂法兰面; 夹爪的 63x63 转接板就贴在这个面上。
+    TCP.y = -(step.z - 49.90mm)        刀片厚度方向(镜像, 与 x/z 构成右手系)
+    TCP.z =  step.y + 16.8mm           装配轴(+y=夹爪朝向) -> 工具轴(+z, 朝外/朝下)
+
+**工具轴到底是 +z 还是 -z**: 是 **+z**。dummy_tcp 与 Link_6 同原点, 而 Link_6
+的网格是 z ∈ [-39, 0] —— 臂的材料整个在 -z 一侧, 也就是说 **z=0 就是法兰面,
+工具只能往 +z 装**。换上 arena 的 tool_down_quat([1,0,0,0], 按 x,y,z,w 解释 =
+绕 X 转 180°), TCP 的 +z 正好指向世界下方, J5 落在 TCP 的 -z 侧 159.3mm(即
+"J5 在 TCP 正上方", 可达性公式就是按这个推的)。之前这里按"工具轴向下 = -z"
+写, 又在 -z 上多减了 40mm(误把 Link_6 的 39mm 当成法兰下方的实体), 结果是整只
+夹爪被装进了小臂里。
+
+所以本脚本输出的网格/参数统一用这套约定: **法兰贴合面 = z 0, 指尖 = +z**。
+夹爪的 63x63 转接板就贴在 z=0 这个面上, `tip_depth` 也就是"法兰面到刀尖"的
+真实长度 164.6mm(不是加上 40mm 的 204.6mm)。
 """
 from __future__ import annotations
 
@@ -44,7 +54,9 @@ PKG = os.path.dirname(HERE)
 AXIS_X = 0.04935     # 两指的对称轴
 AXIS_Z = 0.04990     # 刀片厚度方向的中心
 MOUNT_Y = -0.01680   # 转接板背面 = 机械臂法兰贴合面
-FLANGE_GAP = 0.040   # dummy_tcp 到法兰面(Link_6 网格长度)
+FLANGE_Z = 0.0       # 法兰贴合面在 dummy_tcp 坐标系里的位置(= Link_6 网格的 +z 端)
+# 碰撞体之间的最小留白(m): 手指的转动包络和底座要靠这个数隔开, 见 base_boxes()
+COL_MARGIN = 0.001
 
 # --- 零件 -> 角色。GBK 名字见 tools/ 里的注释; 用 SolidWorks 装配的 NAUO 编号定位 ---
 PARTS = {
@@ -58,7 +70,7 @@ PARTS = {
     "NAUO4": ("jaw_r", "柔性指(-x 侧, 1-FAEFR86组件)"),
 }
 MASS = {"base": 0.300, "jaw_l": 0.035, "jaw_r": 0.035}   # 厂家标称整爪 370g
-REF_DEPTH = -0.160          # 张合量参考深度(工件被抓的位置)
+REF_DEPTH = 0.120           # 张合量参考深度: 距法兰面 120mm 处(工件被抓的位置)
 SLAB = 0.020                # 碰撞盒沿深度的切片厚度
 
 
@@ -66,8 +78,8 @@ def to_tcp() -> np.ndarray:
     """STEP 装配坐标 -> dummy_tcp 的 4x4 变换。"""
     return np.array([
         [1.0, 0.0, 0.0, -AXIS_X],
-        [0.0, 0.0, 1.0, -AXIS_Z],
-        [0.0, -1.0, 0.0, MOUNT_Y - FLANGE_GAP],
+        [0.0, 0.0, -1.0, AXIS_Z],
+        [0.0, 1.0, 0.0, -MOUNT_Y - FLANGE_Z],
         [0.0, 0.0, 0.0, 1.0],
     ])
 
@@ -164,6 +176,60 @@ def collision_boxes(mesh: trimesh.Trimesh, slab: float = SLAB):
     return boxes
 
 
+def _box(lo, hi):
+    """(x_lo,y_lo,z_lo),(x_hi,y_hi,z_hi) -> 生成的盒子格式 [cx,cy,cz,sx,sy,sz]。"""
+    return [round(float((a + b) / 2), 5) for a, b in zip(lo, hi)] + \
+           [round(float(b - a), 5) for a, b in zip(lo, hi)]
+
+
+def jaw_sweep(jaw_boxes, pivot, limit_rad):
+    """手指碰撞盒在整个张合行程上的扫掠, 逐 θ 返回每个盒子的 (x_min, z_min, z_max)。
+
+    指根是插在底座机架里的(STEP 里本来就互相穿模), 所以底座必须把这一块让出来,
+    否则 Gazebo 会把"指根和机架互相嵌入"当成硬接触, 手指直接被顶死 —— 实测现象是
+    给 /gripper_controller/commands 发 0.45rad, 两个关节纹丝不动。
+    """
+    px, pz = pivot[0], pivot[2]
+    out = []
+    for t in np.linspace(0.0, limit_rad, 37):
+        c, s = np.cos(t), np.sin(t)
+        step = []
+        for cx, cy, cz, sx, sy, sz in jaw_boxes:
+            xs, zs = [], []
+            for dx in (-0.5, 0.5):
+                for dz in (-0.5, 0.5):
+                    u, w = cx + dx * sx - px, cz + dz * sz - pz
+                    xs.append(px + u * c - w * s)   # 绕 -y 转 = 指尖朝中心合
+                    zs.append(pz + u * s + w * c)
+            step.append((min(xs), min(zs), max(zs)))
+        out.append(step)
+    return out
+
+
+def base_boxes(mesh: trimesh.Trimesh, jaw_boxes, pivot, limit_rad,
+               margin: float = COL_MARGIN):
+    """底座的碰撞体: 整块包围盒会让指根嵌进去, 所以拆成两块。
+
+    ① 扫掠区下沿以下(转接板 + 电机 + 机架下半): 还是完整包围盒;
+    ② 扫掠区高度上: 只保留两指之间的中央机架(|x| 收到手指扫掠的内侧面以内)。
+
+    ② 丢掉的那部分(两侧机架耳)其实被手指自己的碰撞体盖住了 —— 手指永远在那
+    附近, 工件不可能从那里钻到底座上; 换来的是手指能自由转动。
+    """
+    lo, hi = mesh.bounds
+    sweep = jaw_sweep(jaw_boxes, pivot, limit_rad)
+    z_clear = min(b[1] for step in sweep for b in step) - margin
+    # 中央机架的宽度: 只看"某个 θ 下确实伸进底座高度范围"的那些手指盒子
+    x_clear = min(b[0] for step in sweep for b in step
+                  if b[1] <= hi[2] and b[2] >= z_clear) - margin
+    band = mesh.vertices[mesh.vertices[:, 2] >= z_clear]
+    boxes = [_box((lo[0], lo[1], lo[2]), (hi[0], hi[1], z_clear))]
+    if len(band) and hi[2] > z_clear:
+        boxes.append(_box((-x_clear, band[:, 1].min(), z_clear),
+                          (x_clear, band[:, 1].max(), hi[2])))
+    return boxes
+
+
 def inertia_of(mesh: trimesh.Trimesh, mass: float, name: str) -> dict:
     """按凸包估惯量(原网格不封闭, 直接算体积会得到 nan)。
 
@@ -190,9 +256,9 @@ def main() -> int:
     for role in ("base", "jaw_l", "jaw_r"):
         out[role] = merge(parts, role)
 
-    # 指根转轴 = 根部(法兰以下 115mm 以内)顶点云的中心; 取 +x 侧, 另一侧镜像
+    # 指根转轴 = 离法兰面 115mm 以内那一段(指根)顶点云的中心; 取 +x 侧, 另一侧镜像
     v = out["jaw_l"].vertices
-    root = v[v[:, 2] > MOUNT_Y - FLANGE_GAP - 0.115]
+    root = v[v[:, 2] < FLANGE_Z + 0.115]
     pivot = [round(float(abs(root.mean(axis=0)[0])), 5), 0.0,
              round(float(root.mean(axis=0)[2]), 5)]
 
@@ -203,24 +269,27 @@ def main() -> int:
     gap_per_rad = 2 * (near[0] - pivot[2])
     gap_per_deg = abs(gap_per_rad) * np.pi / 180
 
-    # 最大闭合角: 绕 +y 转 theta 时 x' = dx*cos + dz*sin, 指尖不能越过中心线(x=0)
-    tip = out["jaw_l"].vertices[out["jaw_l"].vertices[:, 2].argmin()]
+    # 最大闭合角: +x 侧的指绕 **-y** 转 theta 时 x' = dx*cos - dz*sin(指尖朝中心合),
+    # 合到指尖越过中心线(x=0)为止
+    tip = out["jaw_l"].vertices[out["jaw_l"].vertices[:, 2].argmax()]
     dx, dz = tip[0] - pivot[0], tip[2] - pivot[2]
     lo, hi = 0.0, 89.0
     for _ in range(60):
         mid = (lo + hi) / 2
         t = np.radians(mid)
-        x = pivot[0] + dx * np.cos(t) + dz * np.sin(t)
+        x = pivot[0] + dx * np.cos(t) - dz * np.sin(t)
         if x > 0.002:
             lo = mid
         else:
             hi = mid
     limit = lo
 
-    # --- 碰撞体: 底座一个包络盒; 手指逐层切片, 保住"往下张开"的锥度 ---
+    # --- 碰撞体: 底座避开手指的转动包络(见 base_boxes); 手指逐层切片,
+    #     保住"往下张开"的锥度 ---
+    jaw_col = collision_boxes(out["jaw_l"])
     col = {
-        "base": bbox_box(out["base"]),
-        "jaw": collision_boxes(out["jaw_l"]),
+        "base": base_boxes(out["base"], jaw_col, pivot, np.radians(limit)),
+        "jaw": jaw_col,
     }
 
     # --- 导出(视觉网格用完整面数, 碰撞网格用盒子) ---
@@ -243,10 +312,11 @@ def main() -> int:
 
     cfg = {
         "frame": "dummy_tcp",
-        "tip_depth": round(float(-out["jaw_l"].bounds[0][2]), 5),
-        "flange_z": round(MOUNT_Y - FLANGE_GAP, 5),
-        "palm_depth": round(float(-out["base"].bounds[0][2]), 5),
+        "tip_depth": round(float(out["jaw_l"].bounds[1][2]), 5),
+        "flange_z": round(float(FLANGE_Z), 5),
+        "palm_depth": round(float(out["base"].bounds[1][2]), 5),
         "pivot": [round(float(v), 5) for v in pivot],
+        # 两片指的 URDF 轴都用 +y(负向轴会被 Gazebo 冻住), 镜像靠命令符号
         "jaw_axis": [0.0, 1.0, 0.0],
         "jaw_limit_deg": round(float(limit), 2),
         "gap_ref_depth": round(float(near[0]), 5),

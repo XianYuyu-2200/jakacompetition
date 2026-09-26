@@ -123,6 +123,10 @@ class SimGripper(Gripper):
     关节角 -> 指间净距的换算用 arena.yaml 里实测的三个数:
     ``jaw_gap_open``(张开时净距) / ``jaw_gap_per_deg``(每合 1° 少多少) /
     ``jaw_limit_deg``(两片指不互相干涉的最大角)。
+
+    ``_angle_for()`` 返回的永远是**正的"闭合量"**; 真正下发时左指取负、右指取正 ——
+    两个关节的轴向量都是 +y(见 wheeltec_gripper.urdf.xacro 里的说明: 用负向轴会让
+    Gazebo 直接把关节冻住), 镜像关系只能靠命令符号表达。
     """
 
     name = "sim"
@@ -144,9 +148,9 @@ class SimGripper(Gripper):
     def _angle_for(self, object_size: float | None) -> float:
         """工件尺寸 -> 关节角(rad), 让指间净距刚好收在工件两侧。"""
         a = self.arena
-        gap_open = a.raw["tool"].get("jaw_gap_open", 0.076)
-        per_deg = a.raw["tool"].get("jaw_gap_per_deg", 0.001265)
-        limit = a.raw["tool"].get("jaw_limit_deg", 37.3)
+        gap_open = a.raw["tool"].get("jaw_gap_open", 0.07033)
+        per_deg = a.raw["tool"].get("jaw_gap_per_deg", 0.001303)
+        limit = a.raw["tool"].get("jaw_limit_deg", 35.86)
         extra = a.raw["tool"].get("jaw_gap_extra", 0.004)
         if object_size is None:
             deg = limit                       # 不知道自己夹的是什么: 合到底
@@ -157,7 +161,10 @@ class SimGripper(Gripper):
 
     def _send(self, angle: float) -> bool:
         msg = self._msg_type()
-        msg.data = [float(angle), float(angle)]   # 两个关节"正数=闭合"同号
+        # 两片指的轴同向(+y), 所以"往中心合"的转向相反: 左指负、右指正。
+        # 行程是对称的 [-limit, +limit](写成 [0, limit] 会让关节卡在边界上被冻住),
+        # 但物理上只有 "往里合" 这半边有意义。
+        msg.data = [-float(angle), float(angle)]
         self.pub.publish(msg)
         if self.node is not None:
             end = time.time() + self.close_delay

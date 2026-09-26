@@ -6,14 +6,16 @@
       <xacro:include filename="$(find wheeltec_gripper)/urdf/wheeltec_gripper.urdf.xacro"/>
       <xacro:wheeltec_gripper prefix="" parent="dummy_tcp"/>
 
-  坐标: 所有网格都画在 **dummy_tcp** 坐标系里(-z 是工具轴, 也就是"往下夹"),
+  坐标: 所有网格都画在 **dummy_tcp** 坐标系里, **+z 是工具轴(朝外/朝下夹)**,
+  z=0 就是机械臂法兰贴合面(Link_6 网格的 +z 端, 材料在 -z 一侧);
   底座 link 与 dummy_tcp 原点重合; 两个手指 link 的原点在各自指根转轴上。
 
   几何全部来自 config/gripper.yaml(由 step/gripper.STEP 实测, 见 tools/step_to_mesh.py):
-    指尖深度 204.6mm —— 这是本夹爪最要紧的一个数: 刀片比工件高得多, 工件是**夹在
+    指尖深度 164.6mm(法兰面 -> 刀尖) —— 这是本夹爪最要紧的一个数: 工件是**夹在
     两片指之间**的, 所以抓取时 TCP 要抬到"工件顶面 + 指尖深度 - 工件高度"那么高,
     刀尖才刚好停在工件底面的上方(见 jaka_competition_kit 的 Arena.grasp_offset)。
-    指根转轴 ±35.9mm, 绕 +y 转 = 张合, 0° 是模型原状(张开), 最大 37.3°(指尖并拢)。
+    指根转轴 ±35.2mm / 距法兰面 82.9mm, 绕 ±y 转 = 张合, 0° 是模型原状(张开),
+    最大 35.9°(指尖并拢)。
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:property name="gripper_cfg"
@@ -48,8 +50,9 @@
         </geometry>
         <material name="gripper_dark"><color rgba="0.28 0.28 0.30 1.0"/></material>
       </visual>
-      <!-- 碰撞体是"整个底座一个包络盒"(12 个面): 底座最低点离 TCP 123.5mm,
-           永远在被抓工件上方, 不需要精确外形; 手指才需要(见下面) -->
+      <!-- 碰撞体是两个盒子(见 step_to_mesh.py 的 base_boxes): 下半段是完整包围盒,
+           指根高度那一段只留中间的机架、两侧让给手指扫掠 —— 一个完整包络盒会把
+           指根夹死, 手指就转不动了。底座最低点离法兰面 83.5mm, 永远在被抓工件上方 -->
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
@@ -66,8 +69,20 @@
 
     <!-- ============ 两片柔性指 ============ -->
     <!--
-      两个关节都用"正角度 = 闭合"的约定: +x 侧的指绕 +y 转, -x 侧的指绕 -y 转,
-      所以下发同一个正角度就能对称闭合, 控制器里不用再区分左右。
+      两片指的关节轴都是 **+y**(向量完全一样, 不随左右镜像)。指尖朝 +z(法兰外侧),
+      所以 +x 侧那片要"往 -y 方向转"才是往中心合, -x 侧那片反之 —— 两片指的
+      **关节角符号相反**: 闭合 = l 出负角 / r 出正角。
+
+      为什么不直接用 <axis> 镜像(写成 "0 -1 0" 那样的负向轴): ign_ros2_control /
+      Gazebo 会**把负向轴的关节冻住**。实测同一套模型只把 +x 侧的轴从 +y 换成 -y,
+      不管下发 +0.45 还是 -0.45, 两个关节都纹丝不动(位姿、碰撞体、行程都没变,
+      只有轴号变了); 改回"轴都是 +y、靠命令符号区分左右"就一切正常。
+      所以镜像交给控制器(见 jaka_competition_kit/gripper.py 的 SimGripper)。
+
+      行程: 0 = 模型原状(张开), 沿闭合方向最多 35.9°(再合两片指的刀尖就碰上)。
+      **行程给的是对称的 [-limit, +limit], 但物理上只有一半有意义**: Gazebo 里
+      关节只要正好卡在行程边界上(例如行程写成 [0, limit]、静止位就是 0)也会动不了,
+      0 落在行程中间才稳。真机上螺杆本来就带不动"往外张", 不会走到正半轴。
     -->
     <xacro:macro name="wheeltec_gripper_jaw" params="prefix side sign">
       <link name="${prefix}gripper_jaw_${side}">
@@ -106,8 +121,10 @@
                 rpy="0 0 0"/>
         <parent link="${prefix}gripper_base"/>
         <child link="${prefix}gripper_jaw_${side}"/>
-        <axis xyz="0 ${sign} 0"/>
-        <limit lower="0.0" upper="${gripper_jaw_limit}" effort="5.0" velocity="3.0"/>
+        <axis xyz="0 1 0"/>
+        <!-- 对称行程: 不能写成 [0, limit] —— 关节卡在边界上 Gazebo 会冻住它 (见上) -->
+        <limit lower="${-gripper_jaw_limit}" upper="${gripper_jaw_limit}"
+               effort="5.0" velocity="3.0"/>
         <!-- 真机是一根 42 步进电机 + 螺杆驱动, 没有弹簧回位: 掉电就停在原地 -->
         <dynamics damping="0.05" friction="0.02"/>
       </joint>

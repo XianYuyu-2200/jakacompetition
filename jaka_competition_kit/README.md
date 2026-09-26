@@ -101,9 +101,11 @@ JAKA_GRIPPER=1 ros2 launch jaka_competition_kit round.launch.py world:=gazebo tr
 拆开改就会出现"URDF 有夹爪、高度按法兰算"这种把手指戳进台面的组合)。
 自备夹爪只要实现 `Gripper.open()/close(object_size)` 就能接入。
 
-> ⚠ 柔性爪的指尖深度是 204.6mm,抓取高度会从 100mm 抬到 213.6mm,
-> 而 580mm 臂展在 r=385mm 处的工具朝下可达上限只有 195.9mm ——
-> **工位 4/6 抓不到**。数字与可选方案见 `docs/WHEELTEC柔性机械爪.md` 第 4 节。
+> ⚠ 柔性爪的指尖深度是 164.6mm(法兰面→刀尖),抓取高度会从 100mm 抬到 173.6mm,
+> 预抓取悬停(再 +35mm)到 208.6mm,而 580mm 臂展在 r=385mm 处的工具朝下可达
+> 上限只有 195.9mm。实测: 工位 1/2/3/5 全流程正常,**工位 4/6 夹起工件后抬到
+> 转场高度(232.6mm)规划失败**,进不了料盒。
+> 数字与可选方案见 `docs/WHEELTEC柔性机械爪.md` 第 4 节。
 
 ---
 ## 3. 接口约定
@@ -224,8 +226,8 @@ ros2 run jaka_competition_kit ref_track1 --ros-args -p debug_timing:=true
    报 `Computed path is not valid`。现为 **200×150**。
 10. **换末端要连"抓取高度"一起换** —— 工件顶面离 TCP 多远, 由
    `Arena.grasp_offset(object_size)` 算: 裸法兰是 `flange_height + clearance`
-   (46mm), 柔性爪是 `tip_depth + tip_clearance − 工件尺寸`(50mm 件 = 159.6mm)。
-   两者差 **114mm**。只换 URDF 不改这里, 手指会直接扎进台面。
+   (46mm), 柔性爪是 `tip_depth + tip_clearance − 工件尺寸`(50mm 件 = 119.6mm)。
+   两者差 **74mm**。只换 URDF 不改这里, 手指会直接扎进台面。
 11. **末端越长, 够得到的半径越小** —— 工具轴朝下时 `J5` 恒在 TCP 正上方
    `wrist_len`(=URDF 里 J5→法兰的 159.3mm), 而 `J5` 被"大臂+小臂 420.5mm"
    的球锁住, 所以 `z_max(r) = 27.7 + √(420.5² − r²)` mm(实测完全吻合)。

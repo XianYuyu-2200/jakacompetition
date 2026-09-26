@@ -1,35 +1,35 @@
 # 夹爪几何参数 —— 由 tools/step_to_mesh.py 从 step/gripper.STEP 实测生成
 # 改 STEP 就重跑那个脚本; 手改这里会在下次生成时被覆盖。
 frame: dummy_tcp
-tip_depth: 0.20462
-flange_z: -0.0568
-palm_depth: 0.12348
+tip_depth: 0.16462
+flange_z: 0.0
+palm_depth: 0.08348
 pivot:
-- 0.03594
+- 0.03523
 - 0.0
-- -0.12587
+- 0.08293
 jaw_axis:
 - 0.0
 - 1.0
 - 0.0
-jaw_limit_deg: 37.31
-gap_ref_depth: -0.16212
-gap_at_open: 0.07596
-gap_per_deg: 0.001265
+jaw_limit_deg: 35.86
+gap_ref_depth: 0.12026
+gap_at_open: 0.07033
+gap_per_deg: 0.001303
 grip_range:
-- 0.029
-- 0.076
+- 0.024
+- 0.07
 inertia:
 - name: base
   mass: 0.3
   origin:
   - -2.0e-05
-  - -3.0e-05
-  - -0.07728
+  - 3.0e-05
+  - 0.03728
   hull_volume: 0.00023079
   ixx: 0.000199199
-  ixy: -0.0
-  ixz: 0.0
+  ixy: 0.0
+  ixz: -0.0
   iyy: 0.0002656
   iyz: -0.0
   izz: 0.000160162
@@ -37,12 +37,12 @@ inertia:
   mass: 0.035
   origin:
   - 0.04048
-  - -3.0e-05
-  - -0.1448
+  - 3.0e-05
+  - 0.1048
   hull_volume: 4.23e-05
   ixx: 2.0112e-05
-  ixy: -0.0
-  ixz: 4.492e-06
+  ixy: 0.0
+  ixz: -4.492e-06
   iyy: 2.2053e-05
   iyz: 0.0
   izz: 4.479e-06

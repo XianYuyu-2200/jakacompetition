@@ -182,10 +182,10 @@ operator(192.168.0.101)/ tracking(192.168.0.102)只读跟随实验代码。
   改任何尺寸后必须跑 `ros2 run jaka_competition_kit arena_check`。
   详见 `design/规则校核报告.md`。
 - **末端多长,直接决定够得到哪里**:规则书要的是行程 0–30mm 的小平行夹爪,所以
-  默认 `tool.gripper: none`。挂上 WHEELTEC 柔性爪(指尖深度 204.6mm)后抓取
-  高度抬 114mm,`z_max(r) = 27.7 + √(420.5² − r²)` mm —— **工位 4/6(r=385mm)
-  与料盒中心(r=363mm)会超出可达范围**,`arena_check` 会逐点报出来。
-  用法与四个可选方案见 `docs/WHEELTEC柔性机械爪.md`。
+  默认 `tool.gripper: none`。挂上 WHEELTEC 柔性爪(法兰面→刀尖 164.6mm)后抓取
+  高度抬 ~74mm,`z_max(r) = 27.7 + √(420.5² − r²)` mm —— **工位 4/6(r=385mm)
+  夹起工件后抬不到转场高度(232.6 > 195.9mm)**,工件进不了料盒;
+  `arena_check` 会逐点报出来。用法与可选方案见 `docs/WHEELTEC柔性机械爪.md`。
 
 - URDF 里**没有负载参数**。抓取类任务需要自己在规划场景里加
   (`AttachedCollisionObject` 或 SRDF 里配置)。Mini 2 的实际负载上限是 2 kg。

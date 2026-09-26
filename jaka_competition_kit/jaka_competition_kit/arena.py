@@ -287,7 +287,7 @@ class Arena:
           ``tip_depth + tip_clearance - object_size``。
 
           这一条决定了竞赛里的作业高度: 赛道一 50mm 工件 -> 顶面在 TCP 下方
-          159.6mm(不带夹爪时是 46mm)。抬得高不高、能不能夹到台面上的小工件,
+          119.6mm(不带夹爪时是 46mm)。抬得高不高、能不能夹到台面上的小工件,
           全看这个数对不对 —— 它必须**正好**等于 URDF 里刀尖到 TCP 的距离。
         """
         if not self.has_gripper:
