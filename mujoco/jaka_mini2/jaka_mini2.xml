@@ -1,0 +1,218 @@
+<mujoco model="jaka_mini2">
+  <!-- JAKA Mini 2 (minicobo) from the competition URDF.
+       Six revolute joints, position actuators, JAKA wordmarks between joints 1-2, on the upper arm, between 4-5, and between 5-6.
+       WHEELTEC MS42DC two-finger gripper on the flange (dummy_tcp == Link_6 origin, tool +Z). -->
+  <compiler angle="radian" eulerseq="XYZ" meshdir="../../jaka_ros2/src/jaka_description/meshes/jaka_minicobo_meshes" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic"/>
+
+  <visual>
+    <headlight ambient="0.48 0.48 0.48" diffuse="0.45 0.45 0.45" specular="0.12 0.12 0.12"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="70" elevation="-18" offwidth="1600" offheight="1000"/>
+    <quality shadowsize="4096"/>
+    <map znear="0.01" zfar="30"/>
+  </visual>
+
+  <default>
+    <default class="visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" material="shell"/>
+    </default>
+    <default class="collision">
+      <!-- Joint jogging should not be blocked by the floor or convex-hull self hits. -->
+      <geom type="mesh" group="3" density="0" rgba="0.94 0.94 0.94 1" contype="0" conaffinity="0"/>
+    </default>
+    <default class="logo">
+      <!-- Solid red wordmark mesh. Classic MuJoCo ignores PNG alpha, so letters are geometry. -->
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.80 0.12 0.15 1"/>
+    </default>
+    <default class="gripper">
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0"/>
+    </default>
+    <joint damping="3" armature="0.02" frictionloss="0.4"/>
+    <position kp="180" kv="18" forcerange="-100 100"/>
+  </default>
+
+  <asset>
+    <texture name="sky" type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture name="grid" type="2d" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="grid" texture="grid" texrepeat="5 5" texuniform="true" reflectance="0.2"/>
+    <material name="table_top" rgba="0.86 0.87 0.89 1" specular="0.12" shininess="0.25" reflectance="0.04"/>
+    <material name="table_edge" rgba="0.62 0.64 0.68 1" specular="0.08" shininess="0.15"/>
+    <material name="table_leg" rgba="0.22 0.23 0.25 1" specular="0.25" shininess="0.4"/>
+    <material name="obj_red" rgba="0.86 0.15 0.14 1" specular="0.45" shininess="0.7"/>
+    <material name="obj_green" rgba="0.12 0.62 0.26 1" specular="0.28" shininess="0.4"/>
+    <material name="obj_blue" rgba="0.16 0.38 0.86 1" specular="0.35" shininess="0.5"/>
+    <material name="mark_red" rgba="0.90 0.16 0.14 1" specular="0.1" shininess="0.2"/>
+    <material name="mark_green" rgba="0.18 0.72 0.30 1" specular="0.1" shininess="0.2"/>
+    <material name="mark_blue" rgba="0.22 0.48 0.95 1" specular="0.1" shininess="0.2"/>
+    <mesh name="place_ring" file="/home/ktz/codex/codex-competition/mujoco/jaka_mini2/assets/place_ring.obj"/>
+    <texture name="jaka_logo_tex" type="2d" file="assets/jaka_logo.png"/>
+    <texture name="jaka_logo_base_tex" type="2d" file="assets/jaka_logo_base.png"/>
+    <material name="shell" rgba="0.94 0.94 0.935 1" specular="0.18" shininess="0.35" reflectance="0.02"/>
+    <material name="logo" texture="jaka_logo_tex" specular="0" shininess="0" reflectance="0"/>
+    <material name="logo_base" texture="jaka_logo_base_tex" specular="0" shininess="0" reflectance="0"/>
+    <mesh inertia="shell" name="wordmark" file="/home/ktz/codex/codex-competition/mujoco/jaka_mini2/assets/jaka_wordmark.obj" scale="0.0684 0.0684 1"/>
+    <mesh inertia="shell" name="wordmark_wrist" file="/home/ktz/codex/codex-competition/mujoco/jaka_mini2/assets/jaka_wordmark.obj" scale="0.0380 0.0380 1"/>
+    <mesh inertia="shell" name="wordmark_j12" file="/home/ktz/codex/codex-competition/mujoco/jaka_mini2/assets/jaka_wordmark_j12.obj"/>
+    <mesh inertia="shell" name="wordmark_j45" file="/home/ktz/codex/codex-competition/mujoco/jaka_mini2/assets/jaka_wordmark_j45.obj"/>
+    <mesh name="link0" file="Link0.STL"/>
+    <mesh name="link1" file="Link1.STL"/>
+    <mesh name="link2" file="Link2.STL"/>
+    <mesh name="link3" file="Link3.STL"/>
+    <mesh name="link4" file="Link4.STL"/>
+    <mesh name="link5" file="Link5.STL"/>
+    <mesh name="link6" file="Link6.STL"/>
+    <mesh name="gripper_base" file="/home/ktz/codex/codex-competition/jaka_ros2/src/wheeltec_gripper/meshes/gripper_base.stl"/>
+    <mesh name="gripper_jaw_l" file="/home/ktz/codex/codex-competition/jaka_ros2/src/wheeltec_gripper/meshes/gripper_jaw_l.stl"/>
+    <mesh name="gripper_jaw_r" file="/home/ktz/codex/codex-competition/jaka_ros2/src/wheeltec_gripper/meshes/gripper_jaw_r.stl"/>
+  </asset>
+
+  <worldbody>
+    <light name="key" pos="0.8 -1.1 1.6" dir="-0.35 0.55 -1" directional="true" castshadow="true"/>
+    <light name="fill" pos="-0.8 -0.4 1.2" dir="0.4 0.2 -1" directional="true" diffuse="0.35 0.35 0.35" castshadow="false"/>
+    <geom name="floor" type="plane" pos="0 0 -0.56" size="0 0 0.05" material="grid"/>
+
+    <!-- Desk under the arm. Top is z=0, the same plane the base is mounted on.
+         Objects sit on the near half; matching placement marks are farther out. -->
+    <body name="table" pos="0 0.26 0">
+      <geom name="table_top" type="box" pos="0 0 -0.012" size="0.48 0.36 0.012" material="table_top" contype="1" conaffinity="1"/>
+      <geom name="table_edge" type="box" pos="0 0 -0.026" size="0.492 0.372 0.004" material="table_edge" contype="0" conaffinity="0"/>
+      <geom name="leg_fl" type="box" pos="-0.42 -0.30 -0.292" size="0.02 0.02 0.268" material="table_leg" contype="0" conaffinity="0"/>
+      <geom name="leg_fr" type="box" pos="0.42 -0.30 -0.292" size="0.02 0.02 0.268" material="table_leg" contype="0" conaffinity="0"/>
+      <geom name="leg_bl" type="box" pos="-0.42 0.30 -0.292" size="0.02 0.02 0.268" material="table_leg" contype="0" conaffinity="0"/>
+      <geom name="leg_br" type="box" pos="0.42 0.30 -0.292" size="0.02 0.02 0.268" material="table_leg" contype="0" conaffinity="0"/>
+    </body>
+
+    <body name="ball_red" pos="0.16 0.06 0.028">
+      <geom name="ball_red" type="sphere" size="0.028" material="obj_red" contype="0" conaffinity="0"/>
+    </body>
+    <body name="box_green" pos="0.16 0.26 0.018">
+      <geom name="box_green" type="box" size="0.050 0.020 0.018" material="obj_green" contype="0" conaffinity="0"/>
+    </body>
+    <body name="cube_blue" pos="0.16 0.46 0.026">
+      <geom name="cube_blue" type="box" size="0.026 0.026 0.026" material="obj_blue" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Placement marks: red ring, green rectangle, blue square. -->
+    <body name="place_red" pos="0.38 0.06 0.0017">
+      <geom name="place_red" type="mesh" mesh="place_ring" material="mark_red" contype="0" conaffinity="0"/>
+    </body>
+    <body name="place_green" pos="0.38 0.26 0">
+      <geom name="place_green_n" type="box" pos="0 0.030 0.0014" size="0.058 0.004 0.0014" material="mark_green" contype="0" conaffinity="0"/>
+      <geom name="place_green_s" type="box" pos="0 -0.030 0.0014" size="0.058 0.004 0.0014" material="mark_green" contype="0" conaffinity="0"/>
+      <geom name="place_green_w" type="box" pos="-0.054 0 0.0014" size="0.004 0.026 0.0014" material="mark_green" contype="0" conaffinity="0"/>
+      <geom name="place_green_e" type="box" pos="0.054 0 0.0014" size="0.004 0.026 0.0014" material="mark_green" contype="0" conaffinity="0"/>
+    </body>
+    <body name="place_blue" pos="0.38 0.46 0">
+      <geom name="place_blue_n" type="box" pos="0 0.036 0.0014" size="0.040 0.004 0.0014" material="mark_blue" contype="0" conaffinity="0"/>
+      <geom name="place_blue_s" type="box" pos="0 -0.036 0.0014" size="0.040 0.004 0.0014" material="mark_blue" contype="0" conaffinity="0"/>
+      <geom name="place_blue_w" type="box" pos="-0.036 0 0.0014" size="0.004 0.032 0.0014" material="mark_blue" contype="0" conaffinity="0"/>
+      <geom name="place_blue_e" type="box" pos="0.036 0 0.0014" size="0.004 0.032 0.0014" material="mark_blue" contype="0" conaffinity="0"/>
+    </body>
+
+
+    <body name="Link_0" pos="-0.12 0.24 0.0005">
+      <inertial pos="-0.00016987 0 0.01328469" mass="0.76174"
+                fullinertia="0.000673719 0.000666782 0.001236633 -1.30756e-08 -1.32624e-06 -1.80736e-11"/>
+      <geom class="visual" mesh="link0"/>
+      <geom class="collision" mesh="link0"/>
+
+      <body name="Link_1" pos="0 0 0.187">
+        <joint name="joint_1" type="hinge" axis="0 0 1" range="-6.28 6.28"/>
+        <inertial pos="-0.000002 0.013408 -0.061631" mass="3.1571"
+                  fullinertia="0.012837547 0.012676200 0.003905746 2.28362e-07 5.81761e-08 -0.001610376"/>
+        <geom class="visual" mesh="link1"/>
+        <geom class="collision" mesh="link1"/>
+        <!-- Wordmark on the column between joint 1 and joint 2, camera side. -->
+        <geom class="logo" name="logo_j12" mesh="wordmark_j12" pos="0 -0.04900 -0.128"
+              xyaxes="1 0 0 0 0 1"/>
+
+        <body name="Link_2" pos="0 -0.006 0" euler="1.5708 -1.5708 0">
+          <joint name="joint_2" type="hinge" axis="0 0 1" range="-2.09 2.09"/>
+          <inertial pos="0.090613 0 0.0043964" mass="1.0141"
+                    fullinertia="0.0019174 0.0073149 0.0064681 6.2208e-07 0.0022687 -3.3214e-07"/>
+          <geom class="visual" mesh="link2"/>
+          <geom class="collision" mesh="link2"/>
+          <!-- Upper-arm wordmark, flush on the flat +Z cover. -->
+          <geom class="logo" name="logo_arm" mesh="wordmark" pos="0.0332 0.0016 0.06230"/>
+
+          <body name="Link_3" pos="0.21 0 0" euler="0 0 -1.5708">
+            <joint name="joint_3" type="hinge" axis="0 0 1" range="-2.27 2.27"/>
+            <inertial pos="0 0.042086 0.012428" mass="2.018"
+                      fullinertia="0.0055107 0.0017496 0.0052708 2.2287e-08 -3.4784e-08 0.0005528"/>
+            <geom class="visual" mesh="link3"/>
+            <geom class="collision" mesh="link3"/>
+
+            <body name="Link_4" pos="0 0.2105 0" euler="-1.5708 0 0">
+              <joint name="joint_4" type="hinge" axis="0 0 1" range="-6.28 6.28"/>
+              <inertial pos="0 0.025946 -0.034928" mass="0.41234"
+                        fullinertia="0.000648308 0.000622438 0.000313550 2.0128e-08 -2.91846e-08 -0.000147789"/>
+              <geom class="visual" mesh="link4"/>
+              <geom class="collision" mesh="link4"/>
+              <!-- Wordmark on the wrist housing between joint 4 and joint 5. -->
+              <geom class="logo" name="logo_j45" mesh="wordmark_j45" pos="0 -0.03740 -0.074"
+                    xyaxes="1 0 0 0 0 1"/>
+
+              <body name="Link_5" pos="0 0 0" euler="1.5708 0 0">
+                <joint name="joint_5" type="hinge" axis="0 0 1" range="-2.09 2.09"/>
+                <inertial pos="0 0.044553 0.010268" mass="1.6793"
+                          fullinertia="0.0040718 0.0013014 0.0039042 4.0506e-07 1.0998e-07 0.00040116"/>
+                <geom class="visual" mesh="link5"/>
+                <geom class="collision" mesh="link5"/>
+                <!-- Wordmark on the wrist tube between joint 5 and joint 6.
+                     Geom +X runs toward joint 6, geom +Z faces outward (+X of Link_5). -->
+                <geom class="logo" name="logo_wrist" mesh="wordmark_wrist" pos="0 0.028 0.05518"
+                      xyaxes="0 1 0 -1 0 0"/>
+
+                <body name="Link_6" pos="0 0.1593 0" euler="-1.5708 0 0">
+                  <joint name="joint_6" type="hinge" axis="0 0 1" range="-6.28 6.28"/>
+                  <inertial pos="0 0 -0.020293" mass="0.31197"
+                            fullinertia="0.000143778 0.000142683 0.000221813 -8.50913e-07 -2.37502e-07 -3.26921e-08"/>
+                  <geom class="visual" mesh="link6"/>
+                  <geom class="collision" mesh="link6"/>
+                  <site name="tcp" pos="0 0 0" size="0.004" rgba="0.85 0.2 0.15 0"/>
+                  <!-- WHEELTEC gripper: meshes are in the flange frame, +Z out of the flange.
+                       Jaw STLs are relative to each pivot. Close = left negative, right positive. -->
+                  <body name="gripper_base" pos="0 0 0">
+                    <inertial pos="-0.00002 0.00003 0.03728" mass="0.30"
+                              fullinertia="0.000199199 0.000265600 0.000160162 0 0 0"/>
+                    <geom class="gripper" name="gripper_base_visual" mesh="gripper_base" rgba="0.28 0.28 0.30 1"/>
+                    <body name="gripper_jaw_l" pos="0.03523 0 0.08293">
+                      <joint name="gripper_jaw_l_joint" type="hinge" axis="0 1 0" range="-0.6259 0.6259"
+                             damping="0.05" armature="0.001" frictionloss="0.02"/>
+                      <inertial pos="0.00525 0.00003 0.02187" mass="0.035"
+                                fullinertia="2.0112e-05 2.2053e-05 4.479e-06 0 -4.492e-06 0"/>
+                      <geom class="gripper" name="gripper_jaw_l_visual" mesh="gripper_jaw_l" rgba="0.85 0.25 0.20 1"/>
+                    </body>
+                    <body name="gripper_jaw_r" pos="-0.03523 0 0.08293">
+                      <joint name="gripper_jaw_r_joint" type="hinge" axis="0 1 0" range="-0.6259 0.6259"
+                             damping="0.05" armature="0.001" frictionloss="0.02"/>
+                      <inertial pos="-0.00525 0.00003 0.02187" mass="0.035"
+                                fullinertia="2.0112e-05 2.2053e-05 4.479e-06 0 4.492e-06 0"/>
+                      <geom class="gripper" name="gripper_jaw_r_visual" mesh="gripper_jaw_r" rgba="0.85 0.25 0.20 1"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="J1" joint="joint_1" ctrlrange="-6.28 6.28" kp="400" kv="30"/>
+    <position name="J2" joint="joint_2" ctrlrange="-2.09 2.09" kp="2800" kv="90"/>
+    <position name="J3" joint="joint_3" ctrlrange="-2.27 2.27" kp="1600" kv="50"/>
+    <position name="J4" joint="joint_4" ctrlrange="-6.28 6.28" kp="80" kv="8"/>
+    <position name="J5" joint="joint_5" ctrlrange="-2.09 2.09" kp="180" kv="12"/>
+    <position name="J6" joint="joint_6" ctrlrange="-6.28 6.28" kp="40" kv="4"/>
+    <position name="grip_l" joint="gripper_jaw_l_joint" ctrlrange="-0.6259 0.6259" kp="4" kv="0.3" forcerange="-5 5"/>
+    <position name="grip_r" joint="gripper_jaw_r_joint" ctrlrange="-0.6259 0.6259" kp="4" kv="0.3" forcerange="-5 5"/>
+  </actuator>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

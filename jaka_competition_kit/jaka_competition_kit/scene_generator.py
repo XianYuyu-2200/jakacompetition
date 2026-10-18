@@ -3,7 +3,7 @@
 职责:
   1. 把工作台 / 工位标记 / 料盒 / 二维码卡摆进 MoveIt 规划场景;
   2. 为赛道一生成一轮二维码序令, 并写出 PNG(裁判打印用);
-  3. 为赛道二在散放区内随机撒 12 件工件(互不重叠);
+  3. 为赛道二每类抽 4 件(共 16 件)摆进散放区, 并摆好四只分类料盒;
   4. 把本轮**真值**发布到 ``/competition/scene``(transient_local, 供判分使用)。
 
 服务:
@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 import random
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional
 
 import rclpy
 import rclpy.node
@@ -32,17 +32,9 @@ from rclpy.qos import DurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from .arena import OBJECT_LIFT, Arena, Box, load_arena, radius
+from .arena import OBJECT_LIFT, Arena, load_arena, radius
 from .qr import make_order, parse, payload, render_png
 from .scene import SceneClient, bin_container, box_object, cylinder_object
-
-OBJECT_LIBRARY = [
-    "纸杯", "半瓶矿泉水", "钢卷尺", "钥匙串", "橡皮擦",
-    "有线鼠标", "订书机", "眼镜盒", "便签本", "马克笔",
-    "胶带座", "塑料螺丝刀", "梳子", "门禁卡套", "橡皮圈",
-    "小号扳手", "茶杯垫", "塑料夹子", "名片盒", "小号毛绒玩具",
-]
-
 
 class SceneGenerator(rclpy.node.Node):
     def __init__(self):
@@ -109,29 +101,33 @@ class SceneGenerator(rclpy.node.Node):
                 objs.append(box_object(f"station_{i}", a.frame_id, (x, y, 0.0),
                                        (ss, ss, th), z_bottom=0.0))
         else:
-            # 赛道二的散放区 y[190,350] 与赛道一的工位阵 y[155,405] **大面积重叠**,
+            # 赛道二的散放区 y[190,365] 与赛道一的工位阵 y[155,405] **大面积重叠**,
             # 把工位板留在场上, 散放的工件就会嵌进 3mm 高的板子里
             # (实测报 station_5 与附着工件碰撞)。只摆当前赛道需要的东西。
             self.scene.remove_existing(station_ids)
-        active = "bin_t1" if track == 1 else "bin_t2"
-        stale = "bin_t2" if track == 1 else "bin_t1"
+        parts = ("floor", "wall_x0", "wall_x1", "wall_y0", "wall_y1")
+        t2_prefixes = [f"bin_{b['id']}" for b in a.track2_bins()] + ["bin_t2"]
         if track == 1:
             objs += bin_container("bin_t1", a.frame_id, a.track1_bin,
                                   a.track1_bin_height)
+            stale = [f"{pre}_{part}" for pre in t2_prefixes for part in parts]
+            active = "bin_t1"
         else:
-            objs += bin_container("bin_t2", a.frame_id, a.track2_bin,
-                                  a.track2_bin_height)
-        # 把另一条赛道的料盒彻底删掉(换赛道重出题时用得上)
-        self.scene.remove_existing([f"{stale}_{part}" for part in
-                                    ("floor", "wall_x0", "wall_x1",
-                                     "wall_y0", "wall_y1")])
+            for b in a.track2_bins():
+                objs += bin_container(f"bin_{b['id']}", a.frame_id, b["box"], b["height"])
+            stale = [f"bin_t1_{part}" for part in parts] + [f"bin_t2_{part}" for part in parts]
+            active = "四只分类料盒"
+            # 二维码只属于赛道一, 换到赛道二时拿掉
+            stale.append("qr_card")
+        self.scene.remove_existing(stale)
         if not self.scene.apply(objs):
             self.get_logger().error("静态场景下发失败")
         else:
             parts = ["工作台"]
             if track == 1:
                 parts.append(f"工位板(高 {th*1000:.0f}mm)")
-            parts += [active, "二维码卡"]
+                parts.append("二维码卡")
+            parts.append(active)
             self.get_logger().info(" / ".join(parts) + " 已摆放")
 
     # ---------- 出题 ----------
@@ -178,7 +174,10 @@ class SceneGenerator(rclpy.node.Node):
         return response
 
     def _all_workpiece_ids(self) -> list:
-        return [f"wp_{i}" for i in range(1, 21)]
+        catalog = [f"wp_{o['category']}_{o['id']}" for o in self.arena.track2_objects()]
+        # 旧版赛道二用过 wp_1..wp_20, 一起清掉, 避免换题后幽灵工件还挂着
+        legacy = [f"wp_{i}" for i in range(1, 21)]
+        return catalog + legacy
 
     def _clear_dynamic(self):
         ids = self._all_workpiece_ids()
@@ -226,76 +225,69 @@ class SceneGenerator(rclpy.node.Node):
                         "height": self.arena.track1_bin_height}}
 
     def _generate_track2(self, rng: random.Random, seed: int) -> Dict:
-        t2 = self.arena.raw["track2"]
-        n = self.arena.t2_objects_per_round
-        area: Box = self.arena.scatter
-        lo, hi = t2["object_size_range"]
-        gap = self.arena.t2_min_gap
-
-        def attempt() -> List[Tuple[float, float, float]]:
-            """一次随机序列投放(随机顺序 + 拒绝采样)。"""
-            placed: List[Tuple[float, float, float]] = []
-            for _ in range(4000):
-                if len(placed) >= n:
-                    break
-                size = rng.uniform(lo, hi)
-                half = size / 2.0
-                x = rng.uniform(area.x_range[0] + half, area.x_range[1] - half)
-                y = rng.uniform(area.y_range[0] + half, area.y_range[1] - half)
-                r = radius(x, y)
-                # 内外边界都要判: 太靠近基座会撞本体, 太远则 IK 无解。
-                if r < self.arena.r_min or r > self.arena.r_max:
-                    continue
-                if all(abs(x - px) >= half + ph + gap
-                       or abs(y - py) >= half + ph + gap for px, py, ph in placed):
-                    placed.append((x, y, half))
-            return placed
-
-        # 单次贪心投放经常"先摆的大件把后面挤死"。整轮重来几十次,
-        # 取最好的一次 —— 实测 300 个种子 100% 能放下 12 件。
-        placed = attempt()
-        best = list(placed)
-        for _ in range(120):
-            if len(best) >= n:
-                break
-            cur = attempt()
-            if len(cur) > len(best):
-                best = cur
-        placed = best
-        if len(placed) < n:
-            self.get_logger().warn(
-                f"只放下了 {len(placed)}/{n} 件, 请放宽散放区或减小工件尺寸上限")
+        """每类 5 选 4, 共 16 件, 按类别放进对应料盒。"""
+        picked, withheld = self.arena.sample_track2(rng)
+        placed = self.arena.pack_track2(picked, rng)
+        if not placed or len(placed) != len(picked):
+            self.get_logger().error("散放区摆不下 16 件, 请检查 arena.yaml")
+            placed = placed or []
         else:
+            rs = [radius(it["xy"][0], it["xy"][1]) for it in placed]
+            counts = {}
+            for it in placed:
+                counts[it["category_name"]] = counts.get(it["category_name"], 0) + 1
             self.get_logger().info(
-                f"散放区投放 {len(placed)}/{n} 件, "
-                f"r = {min(radius(x, y) for x, y, _ in placed)*1000:.0f} .. "
-                f"{max(radius(x, y) for x, y, _ in placed)*1000:.0f} mm")
+                f"散放区投放 {len(placed)}/{self.arena.t2_objects_per_round} 件 "
+                + " ".join(f"{k}{v}" for k, v in counts.items())
+                + f", r = {min(rs)*1000:.0f} .. {max(rs)*1000:.0f} mm")
 
         objs, manifest = [], []
-        labels = rng.sample(OBJECT_LIBRARY, k=min(len(placed), len(OBJECT_LIBRARY)))
-        for i, (x, y, half) in enumerate(placed, start=1):
-            obj_id = f"wp_{i}"
-            size = half * 2
-            shape = "cylinder" if i % 4 == 0 else "box"
+        for it in placed:
+            x, y = it["xy"]
+            sx, sy, sz = (float(v) for v in it["world_dims"])
+            shape = it.get("shape", "box")
+            obj_id = f"wp_{it['category']}_{it['id']}"
             if shape == "cylinder":
-                objs.append(cylinder_object(obj_id, self.arena.frame_id,
-                                            (x, y, half + OBJECT_LIFT), half, size))
+                objs.append(cylinder_object(
+                    obj_id, self.arena.frame_id,
+                    (x, y, OBJECT_LIFT + sz / 2.0), sx / 2.0, sz))
             else:
-                objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
-                                       (size, size, size), z_bottom=OBJECT_LIFT))
-            top = 2 * half + OBJECT_LIFT
+                objs.append(box_object(
+                    obj_id, self.arena.frame_id, (x, y, 0.0),
+                    (sx, sy, sz), z_bottom=OBJECT_LIFT))
+            top = OBJECT_LIFT + sz
+            grasp_z = self.arena.grasp_tcp_z(top, sz)
             manifest.append({
-                "id": obj_id, "label": labels[i - 1], "xy": [x, y],
-                "size": size, "z": half + OBJECT_LIFT, "top_z": top, "shape": shape,
-                "grasp_tcp_z": self.arena.grasp_tcp_z(top, size),
-                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top, size)),
-                "release_tcp_z": self.arena.release_tcp_z(size),
+                "id": obj_id,
+                "label": it["name"],
+                "category": it["category"],
+                "category_name": it["category_name"],
+                "bin_id": it["bin_id"],
+                "xy": [x, y],
+                "yaw_deg": it.get("yaw_deg", 0),
+                "dims": [sx, sy, sz],
+                "size": sz,
+                "grasp_width": min(sx, sy),
+                "z": OBJECT_LIFT + sz / 2.0,
+                "top_z": top,
+                "shape": shape,
+                "grasp_tcp_z": grasp_z,
+                "approach_z": self.arena.approach_z(grasp_z),
+                "release_tcp_z": self.arena.release_tcp_z(sz),
             })
-        self.scene.apply(objs)
-        return {"track": 2, "seed": seed, "objects": manifest,
-                "bin": {"center": list(self.arena.track2_bin.center),
-                        "size": list(self.arena.track2_bin.size),
-                        "height": self.arena.track2_bin_height}}
+        if objs:
+            self.scene.apply(objs)
+        bins = [{
+            "id": b["id"],
+            "name": b["name"],
+            "center": list(b["box"].center),
+            "size": list(b["box"].size),
+            "height": b["height"],
+        } for b in self.arena.track2_bins()]
+        return {"track": 2, "seed": seed, "objects": manifest, "bins": bins,
+                "withheld": [{"id": w["id"], "name": w["name"],
+                              "category": w["category"],
+                              "category_name": w["category_name"]} for w in withheld]}
 
 
 def main(args=None):

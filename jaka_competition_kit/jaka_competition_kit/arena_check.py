@@ -33,9 +33,12 @@ def main(args=None):
           f"{math.hypot(nx, ny)*1000:.0f} mm  <- 判可达性的关键点")
     print("          四角 r = " +
           ", ".join(f"{math.hypot(*c)*1000:.0f}" for c in s.corners()) + " mm")
-    b2 = a.track2_bin
-    print(f"  料盒  : ({b2.center[0]*1000:7.1f}, {b2.center[1]*1000:6.1f}) mm   r = "
-          f"{math.hypot(*b2.center)*1000:6.1f} mm")
+    for b in a.track2_bins():
+        box = b["box"]
+        print(f"  {b['name']}盒: ({box.center[0]*1000:7.1f}, {box.center[1]*1000:6.1f}) mm   r = "
+              f"{math.hypot(*box.center)*1000:6.1f} mm")
+    print(f"  工件库: {len(a.track2_objects())} 种, 每轮 {a.t2_objects_per_round} 件"
+          f"（每类抽 {a.raw['track2']['pick_per_category']}）")
 
     print("\n末端几何:")
     print(f"  夹爪: {a.gripper}"

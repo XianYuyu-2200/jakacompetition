@@ -10,8 +10,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from geometry_msgs.msg import Pose, PoseStamped, Quaternion
-from moveit_msgs.msg import (AttachedCollisionObject, CollisionObject,
-                             PlanningScene)
+from moveit_msgs.msg import (AllowedCollisionEntry, AttachedCollisionObject,
+                             CollisionObject, PlanningScene)
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene
 from shape_msgs.msg import SolidPrimitive
 
@@ -168,6 +168,56 @@ class SceneClient:
         res = self._wait(self._apply, req)
         return bool(res and res.success)
 
+    def set_pairs_allowed(self, links: Sequence[str], objects: Sequence[str],
+                          allowed: bool) -> bool:
+        """允许或恢复两组名字之间的碰撞。
+
+        差分消息里的碰撞矩阵会**整表替换**当前矩阵, 所以这里先读出完整矩阵,
+        改完再整表写回, 不能只发被改的那几行。
+        """
+        components = GetPlanningScene.Request().components
+        req = GetPlanningScene.Request()
+        req.components.components = components.ALLOWED_COLLISION_MATRIX
+        res = self._wait(self._get, req)
+        if res is None:
+            return False
+        src = res.scene.allowed_collision_matrix
+        names = list(src.entry_names)
+        matrix = [list(e.enabled) for e in src.entry_values]
+        while len(matrix) < len(names):
+            matrix.append([False] * len(names))
+        for row in matrix:
+            if len(row) < len(names):
+                row.extend([False] * (len(names) - len(row)))
+
+        def idx(name: str) -> int:
+            if name not in names:
+                names.append(name)
+                for row in matrix:
+                    row.append(False)
+                matrix.append([False] * len(names))
+            return names.index(name)
+
+        for a in links:
+            for b in objects:
+                if not a or not b or a == b:
+                    continue
+                i, j = idx(str(a)), idx(str(b))
+                matrix[i][j] = bool(allowed)
+                matrix[j][i] = bool(allowed)
+
+        scene = PlanningScene()
+        scene.is_diff = True
+        scene.allowed_collision_matrix.entry_names = names
+        for row in matrix:
+            entry = AllowedCollisionEntry()
+            entry.enabled = [bool(v) for v in row]
+            scene.allowed_collision_matrix.entry_values.append(entry)
+        out = ApplyPlanningScene.Request()
+        out.scene = scene
+        applied = self._wait(self._apply, out)
+        return bool(applied and applied.success)
+
     def snapshot_ids(self, timeout: float = 15.0):
         """读回规划场景, 返回 ``(世界物体 id 集合, 已附着物体 id 集合)``。
 
@@ -250,9 +300,18 @@ class SceneClient:
 
     def clear_all(self) -> bool:
         self.apply([], [])
-        return self.remove(["table", "bin_t1", "bin_t2", "qr_card"]
-                           + [f"station_{i}" for i in range(1, 7)]
-                           + [f"wp_{i}" for i in range(12)])
+        parts = ("floor", "wall_x0", "wall_x1", "wall_y0", "wall_y1")
+        prefixes = ["bin_t1", "bin_t2", "bin_life", "bin_tool", "bin_toy", "bin_fruit"]
+        ids = ["table", "qr_card"]
+        ids += [f"station_{i}" for i in range(1, 7)]
+        ids += [f"wp_{i}" for i in range(1, 21)]
+        ids += [f"{pre}_{part}" for pre in prefixes for part in parts]
+        try:
+            from .arena import load_arena
+            ids += [f"wp_{o['category']}_{o['id']}" for o in load_arena().track2_objects()]
+        except Exception:
+            pass
+        return self.remove(ids)
 
     def attach(self, obj_id: str, link: str,
                touch_links: Sequence[str]) -> bool:
@@ -286,11 +345,17 @@ class SceneClient:
         return self.apply([], [aco])
 
     def put_back(self, obj_id: str, frame_id: str, xy_z_bottom: Sequence[float],
-                 size: float) -> bool:
+                 size: float, dims=None, shape: str = "box") -> bool:
         """把工件从末端摘下来、原样放回台面上(失败重试前的还原)。"""
         self.detach_any([obj_id])
-        obj = box_object(obj_id, frame_id, (xy_z_bottom[0], xy_z_bottom[1], 0.0),
-                         (size, size, size), z_bottom=float(xy_z_bottom[2]))
+        x, y, z_bottom = (float(v) for v in xy_z_bottom)
+        if shape == "cylinder":
+            h = float(dims[2]) if dims is not None else size
+            rad = float(dims[0]) / 2.0 if dims is not None else size / 2.0
+            obj = cylinder_object(obj_id, frame_id, (x, y, z_bottom + h / 2.0), rad, h)
+        else:
+            d = tuple(dims) if dims is not None else (size, size, size)
+            obj = box_object(obj_id, frame_id, (x, y, 0.0), d, z_bottom=z_bottom)
         return self.apply([obj])
 
     def release_into_bin(self, obj_id: str, link: str) -> bool:

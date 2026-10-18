@@ -55,3 +55,11 @@ __pycache__/
 *.xwd
 *.swp
 .DS_Store
+
+# ================= 文档生成 =================
+design/.fontcache/
+
+design/.vendor/
+
+# MuJoCo 本地虚拟环境，不提交
+mujoco/.venv/

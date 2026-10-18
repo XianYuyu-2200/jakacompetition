@@ -66,7 +66,15 @@ PALETTE: Dict[str, Tuple[float, float, float, float]] = {
     "qr":      (0.97, 0.97, 0.96, 1.0),   # 二维码卡: 白
     "default": (0.72, 0.72, 0.74, 1.0),
 }
-# 工件用一组暖色, 按序号轮换, 好区分
+# 四只分类料盒各一色, 和工件类别对应。工件本身不按类别上色,
+# 否则仿真里看颜色就能分拣, 识别题就没了。
+CATEGORY_COLORS: Dict[str, Tuple[float, float, float, float]] = {
+    "life":  (0.20, 0.45, 0.82, 1.0),   # 生活: 蓝
+    "tool":  (0.90, 0.48, 0.12, 1.0),   # 工具: 橙
+    "toy":   (0.78, 0.28, 0.55, 1.0),   # 玩具: 粉
+    "fruit": (0.28, 0.68, 0.32, 1.0),   # 水果: 绿
+}
+# 工件用一组暖色, 按名字轮换, 好区分
 WORKPIECE_COLORS: List[Tuple[float, float, float, float]] = [
     (0.91, 0.36, 0.20, 1.0), (0.95, 0.65, 0.15, 1.0),
     (0.35, 0.66, 0.42, 1.0), (0.24, 0.55, 0.82, 1.0),
@@ -100,12 +108,12 @@ def _compose(parent_pos: Sequence[float], parent_quat: Quat,
 
 
 def _color_for(name: str) -> Tuple[float, float, float, float]:
-    head = name.split("_")[0]
+    parts = name.split("_")
+    head = parts[0]
+    if head == "bin" and len(parts) >= 2 and parts[1] in CATEGORY_COLORS:
+        return CATEGORY_COLORS[parts[1]]
     if head == "wp":
-        try:
-            idx = int(name.split("_")[1]) - 1
-        except (IndexError, ValueError):
-            idx = 0
+        idx = sum(ord(c) for c in name)
         return WORKPIECE_COLORS[idx % len(WORKPIECE_COLORS)]
     return PALETTE.get(head, PALETTE["default"])
 

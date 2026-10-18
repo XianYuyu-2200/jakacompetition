@@ -5,10 +5,12 @@
 
 ## 一句话结论
 
-`competition.md` 已按实测修正**定稿**。初稿有 **1 个致命几何错误**(工位阵放得太远)、
+`competition.md` 已按实测修正。初稿有 **1 个致命几何错误**(工位阵放得太远)、
 **1 个参数写错**(重复定位精度)、**2 个规则自相矛盾**、**1 个时间预算不成立**;
-改为定稿版的过程中把整条流水线实跑跑通,又发现 **8 个静态算不出来的问题**
-(见 `规则校核报告.md` 附二)并重新标定了限时(见附三)。
+改为定稿的过程中把整条流水线实跑跑通,又发现 **8 个静态算不出来的问题**
+(见 `规则校核报告.md` 附二)。限时标过两次:附三是打开加速度限位后的数字,
+其中赛道二仍是 **12 件一只料盒**(限时 320 秒,已作废);**现行赛道二是 16 件四类分拣,
+限时 115 秒 / 效率满分 85 秒**,见附四。
 
 下面所有数字都是在本机用 `jaka_minicobo` URDF + MoveIt 真跑出来的,不是估算。
 
@@ -18,7 +20,7 @@
 |---|---|
 | `规则校核报告.md` | 逐条列出 `competition.md` 的问题 + 实测依据 + 修改建议 |
 | `赛事设计指南.md` | 怎么从零把这两个比赛办起来(赛场/软件/裁判/赛程) |
-| `arena_layout.png` | 赛场布局图(原稿 vs 建议),可直接放进赛题细则 |
+| `arena_layout.png` | 早期布局对比图(原稿 vs 第一轮建议)。**不是现行赛场**,细则用 `fig_arena_track1.png` / `fig_arena_track2.png` |
 | `reach_envelope.png` | 竖直抓取可达域曲线 |
 | `workspace_check.py` | 工作空间剖面 + FK 自检 |
 | `table_clearance.py` | 桌面干涉校核(用真实 STL 网格) |
@@ -29,6 +31,13 @@
 | `calibrate.sh` | **限时标定工具**:反复跑参考实现,输出中位数与建议限时 |
 | `arena_check.py` | 赛场校核入口(与 `ros2 run jaka_competition_kit arena_check` 等价) |
 | `competition_scene_track1.png` | RViz 里的赛道一实景(工作台/工位板/料盒/二维码) |
+| `make_rulebook_figures.py` | **赛题细则配图生成**:赛场布局(两条赛道)/ 可达作业带 / 流程图 |
+| `rulebook_content.py` | **赛题细则的唯一内容源**,PDF 与 Word 两个版本共用,避免改稿不同步 |
+| `build_competition_pdf.py` | **赛题细则 PDF 生成器**(reportlab),输出到仓库根目录 |
+| `build_competition_docx.py` | **赛题细则 Word 生成器**(python-docx),输出到仓库根目录 |
+| `_fonts.py` | 把系统 Noto Sans CJK 转成 TrueType 并缓存,供配图与 PDF 嵌入中文 |
+| `_docx_lib.py` | 按需加载 python-docx(本机无 pip 时自动从 PyPI 取 wheel 到 `.vendor/`) |
+| `fig_arena_track1.png` / `fig_arena_track2.png` / `fig_workspace.png` / `fig_flow.png` | 上一脚本生成的正式配图 |
 
 ## 实测数据(全部可复现)
 
@@ -87,4 +96,12 @@ python3 -u track1_pick_demo.py 246135           # 赛道一完整抓取循环
 | 速度缩放 1.0, 规划尝试 1 次 | ~23 s | ~140 s(推算) |
 
 → 原稿"限时 90 秒 / 60 秒内完成得效率满分"对 6 个工件**不成立**,
-详见 `规则校核报告.md` 第 7 条。
+详见 `规则校核报告.md` 第 7 条。上表是早期骨架 `track1_pick_demo.py` 的空跑,
+**不是现行限时**。现行基准是工具包里的参考实现(假硬件、打开加速度限位):
+
+| 赛道 | 成绩 | 中位数 | 限时 | 效率满分线 |
+|---|---|---:|---:|---:|
+| 一 `ref_track1` | 4 轮全 6/6 | 102.7 s | 145 s | 105 s |
+| 二 `ref_track2` | 3 轮全 16/16(四类分拣) | 81.3 s | 115 s | 85 s |
+
+换机器用 `bash calibrate.sh <赛道> 3` 重标。这组数字不能拿到 Gazebo 或真机上用。

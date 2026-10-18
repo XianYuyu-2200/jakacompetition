@@ -309,6 +309,14 @@ class Arena:
                             self.transfer_tcp_z(gz0, sz, self.track1_bin)),
                            ("料盒中心 投放", binr, self.release_tcp_z(sz))):
             rows.append((name, r, z, self.max_tcp_z(r), self.reach_ok(r, z)))
+        sz2 = self.track2_max_object_size
+        top2 = OBJECT_LIFT + sz2
+        gz2 = self.grasp_tcp_z(top2, sz2)
+        for b in self.track2_bins():
+            r = math.hypot(*b["box"].center)
+            for name, z in ((f"{b['name']}盒 转场", self.transfer_tcp_z(gz2, sz2, b["box"])),
+                            (f"{b['name']}盒 投放", self.release_tcp_z(sz2))):
+                rows.append((name, r, z, self.max_tcp_z(r), self.reach_ok(r, z)))
         return rows
 
     @property
@@ -366,11 +374,18 @@ class Arena:
         return all(abs(a - b) < 1e-9
                    for a, b in zip(self.track1_bin.center, bin_box.center))
 
+    def _bin_height(self, bin_box: Box) -> float:
+        """这只料盒的侧墙高度。赛道二四只盒子高度可以各自不同。"""
+        if self._is_track1_bin(bin_box):
+            return self.track1_bin_height
+        for b in self.track2_bins():
+            if all(abs(a - c) < 1e-9 for a, c in zip(b["box"].center, bin_box.center)):
+                return b["height"]
+        return self.track2_bin_height
+
     def bin_top_z(self, bin_box: Box) -> float:
         """料盒**侧墙顶面**高度。"""
-        h = (self.track1_bin_height if self._is_track1_bin(bin_box)
-             else self.track2_bin_height)
-        return float(self.table["top_z"]) + h
+        return float(self.table["top_z"]) + self._bin_height(bin_box)
 
     @property
     def station_top(self) -> float:
@@ -383,7 +398,8 @@ class Arena:
 
     @property
     def track2_max_object_size(self) -> float:
-        return float(self.raw["track2"]["object_size_range"][1])
+        """赛道二工件里最高的一件(竖直尺寸)。转场高度要越过它。"""
+        return max(float(o["dims"][2]) for o in self.track2_objects())
 
     def source_area_top_z(self, bin_box: Box) -> float:
         """工件区最高的东西有多高(工位板 + 最高的一件工件, 或桌面 + 最高工件)。"""
@@ -432,14 +448,32 @@ class Arena:
         s = self.raw["track2"]["scatter"]
         return Box(tuple(s["center"]), tuple(s["size"]))
 
+    def track2_bins(self) -> List[Dict]:
+        """四只分类料盒。``box`` 是俯视矩形, ``id`` 与工件类别一致。"""
+        bins = []
+        for b in self.raw["track2"]["bins"]:
+            bins.append({
+                "id": b["id"],
+                "name": b["name"],
+                "box": Box(tuple(b["center"]), tuple(b["size"])),
+                "height": float(b["height"]),
+            })
+        return bins
+
+    def track2_bin_by_id(self, bin_id: str) -> Dict:
+        for b in self.track2_bins():
+            if b["id"] == bin_id:
+                return b
+        raise KeyError(f"没有类别料盒 {bin_id!r}")
+
     @property
     def track2_bin(self) -> Box:
-        b = self.raw["track2"]["bin"]
-        return Box(tuple(b["center"]), tuple(b["size"]))
+        """兼容旧调用: 返回第一只赛道二料盒。新代码请用 ``track2_bin_by_id``。"""
+        return self.track2_bins()[0]["box"]
 
     @property
     def track2_bin_height(self) -> float:
-        return float(self.raw["track2"]["bin"]["height"])
+        return max(b["height"] for b in self.track2_bins())
 
     @property
     def t2_objects_per_round(self) -> int:
@@ -449,13 +483,98 @@ class Arena:
     def t2_min_gap(self) -> float:
         return float(self.raw["track2"]["min_gap"])
 
-    @property
-    def t2_grasp_z(self) -> float:
-        return float(self.raw["track2"]["grasp_z"])
+    def track2_categories(self) -> List[Dict]:
+        return list(self.raw["track2"]["categories"])
 
-    @property
-    def t2_release_z(self) -> float:
-        return float(self.raw["track2"]["release_z"])
+    def track2_objects(self) -> List[Dict]:
+        """20 件标准工件, 每件带上类别。"""
+        out = []
+        for cat in self.track2_categories():
+            for obj in cat["objects"]:
+                item = dict(obj)
+                item["category"] = cat["id"]
+                item["category_name"] = cat["name"]
+                item["bin_id"] = cat["id"]
+                out.append(item)
+        return out
+
+    def sample_track2(self, rng) -> Tuple[List[Dict], List[Dict]]:
+        """每类 5 选 4。返回 (上场的 16 件, 每类被抽走的那 1 件)。"""
+        k = int(self.raw["track2"]["pick_per_category"])
+        picked: List[Dict] = []
+        withheld: List[Dict] = []
+        for cat in self.track2_categories():
+            choices = []
+            for obj in cat["objects"]:
+                item = dict(obj)
+                item["category"] = cat["id"]
+                item["category_name"] = cat["name"]
+                item["bin_id"] = cat["id"]
+                choices.append(item)
+            chosen = rng.sample(choices, k)
+            chosen_ids = {c["id"] for c in chosen}
+            picked.extend(chosen)
+            withheld.extend(c for c in choices if c["id"] not in chosen_ids)
+        rng.shuffle(picked)
+        return picked, withheld
+
+    def pack_track2(self, objects: List[Dict], rng) -> List[Dict] | None:
+        """把工件摆进散放区。长边沿 +x, 货架装箱, 行内和行间至少留 ``min_gap``。
+
+        成功返回带 ``xy`` / ``world_dims`` / ``yaw_deg`` 的列表; 摆不下返回 None。
+        竖直尺寸不参与占地。圆柱不旋转。
+        """
+        area = self.scatter
+        gap = self.t2_min_gap
+        x0, x1 = area.x_range
+        y0, y1 = area.y_range
+        width, height = x1 - x0, y1 - y0
+        items = []
+        for obj in objects:
+            sx, sy, sz = (float(v) for v in obj["dims"])
+            yaw = 0
+            if obj.get("shape") != "cylinder" and sy > sx:
+                sx, sy = sy, sx
+                yaw = 90
+            items.append({**obj, "_sx": sx, "_sy": sy, "_sz": sz, "_yaw": yaw})
+        # 不要先洗牌再只按短边排序: 相同短边的先后会改变行的填充,
+        # 有些抽法会多出一行, 175mm 的散放区放不下。按短边、长边、id
+        # 排成全序后, 货架装箱对同一组工件是确定的, 5000 个种子都放得下。
+        items.sort(key=lambda t: (-t["_sy"], -t["_sx"], str(t.get("id", ""))))
+        rows: List[Dict] = []
+        for it in items:
+            best = None
+            best_h = 1e9
+            for row in rows:
+                extra = it["_sx"] if row["used"] == 0.0 else it["_sx"] + gap
+                if row["used"] + extra <= width + 1e-9 and it["_sy"] <= row["h"] + 1e-9 and row["h"] < best_h:
+                    best, best_h = row, row["h"]
+            if best is None:
+                rows.append({"h": it["_sy"], "used": it["_sx"], "items": [it]})
+            else:
+                extra = it["_sx"] if best["used"] == 0.0 else it["_sx"] + gap
+                best["used"] += extra
+                best["items"].append(it)
+        total_h = sum(r["h"] for r in rows) + gap * max(0, len(rows) - 1)
+        if total_h > height + 1e-6:
+            return None
+        slack_y = height - total_h
+        y = y0 + (rng.uniform(0.0, slack_y) if slack_y > 1e-6 else 0.0)
+        placed: List[Dict] = []
+        for row in rows:
+            slack_x = width - row["used"]
+            x = x0 + (rng.uniform(0.0, slack_x) if slack_x > 1e-6 else 0.0)
+            for it in row["items"]:
+                cx = x + it["_sx"] / 2.0
+                cy = y + (row["h"] - it["_sy"]) / 2.0 + it["_sy"] / 2.0
+                kept = {k: v for k, v in it.items() if not k.startswith("_")}
+                kept["xy"] = [cx, cy]
+                kept["yaw_deg"] = it["_yaw"]
+                kept["world_dims"] = [it["_sx"], it["_sy"], it["_sz"]]
+                placed.append(kept)
+                x += it["_sx"] + gap
+            y += row["h"] + gap
+        return placed
 
     # ---- 校核 ----
     def validate(self) -> List[str]:
@@ -481,7 +600,8 @@ class Arena:
         for i, x, y in self.stations():
             check_point(f"工位{i} 中心", x, y)
         check_point("赛道一料盒 中心", *self.track1_bin.center)
-        check_point("赛道二料盒 中心", *self.track2_bin.center)
+        for b in self.track2_bins():
+            check_point(f"赛道二{b['name']}盒 中心", *b["box"].center)
 
         # 散放区:工件可能落在区内任意位置, 所以"最近点"和"最远角"都要在带内。
         # 只查四角是不够的 —— 近边中点往往比近角离基座更近。
@@ -504,14 +624,22 @@ class Arena:
                    + ["散放区"])
         boxes = ([Box((x, y), (100e-3, 100e-3)) for _, x, y in self.stations()]
                  + [self.scatter])
-        for nm, box in (("赛道一料盒", self.track1_bin),
-                        ("赛道二料盒", self.track2_bin)):
+        t2_bins = self.track2_bins()
+        for nm, box in [("赛道一料盒", self.track1_bin)] + [
+                (f"赛道二{b['name']}盒", b["box"]) for b in t2_bins]:
             for rn, ob in zip(regions, boxes):
                 gx = min(box.x_range[1], ob.x_range[1]) - max(box.x_range[0], ob.x_range[0])
                 gy = min(box.y_range[1], ob.y_range[1]) - max(box.y_range[0], ob.y_range[0])
                 if gx > 0 and gy > 0:
                     problems.append(f"{nm} 与 {rn} 相交 "
                                     f"({gx*1000:.0f}×{gy*1000:.0f}mm), 需留出间隙")
+        for i, a in enumerate(t2_bins):
+            for b in t2_bins[i + 1:]:
+                ba, bb = a["box"], b["box"]
+                gx = min(ba.x_range[1], bb.x_range[1]) - max(ba.x_range[0], bb.x_range[0])
+                gy = min(ba.y_range[1], bb.y_range[1]) - max(ba.y_range[0], bb.y_range[0])
+                if gx > 0 and gy > 0:
+                    problems.append(f"赛道二{a['name']}盒 与 {b['name']}盒 相交")
 
         # 台面包含检查
         t = self.table
@@ -519,13 +647,83 @@ class Arena:
         items = [(f"工位{i}", Box((x, y), (100e-3, 100e-3)))
                  for i, x, y in self.stations()]
         items.append(("赛道一料盒", self.track1_bin))
-        items.append(("赛道二料盒", self.track2_bin))
+        items.extend((f"赛道二{b['name']}盒", b["box"]) for b in self.track2_bins())
         items.append(("散放区", self.scatter))
         for nm, ob in items:
             if not (tb.x_range[0] <= ob.x_range[0] and ob.x_range[1] <= tb.x_range[1]
                     and tb.y_range[0] <= ob.y_range[0] and ob.y_range[1] <= tb.y_range[1]):
                 problems.append(f"{nm} 超出台面范围 {tb.size[0]*1000:.0f}×{tb.size[1]*1000:.0f}mm")
+
+        problems.extend(self._audit_track2_library())
         return problems
+
+    def _audit_track2_library(self) -> List[str]:
+        """工件库必须是 4 类 × 5 件, 并且随机抽 16 件后摆得进散放区。"""
+        import random
+        problems: List[str] = []
+        cats = self.track2_categories()
+        per = int(self.raw["track2"]["per_category"])
+        pick = int(self.raw["track2"]["pick_per_category"])
+        if len(cats) != 4:
+            problems.append(f"赛道二应有 4 个类别, 实际 {len(cats)}")
+        ids = []
+        bin_ids = {b["id"] for b in self.track2_bins()}
+        for cat in cats:
+            objs = cat.get("objects", [])
+            if len(objs) != per:
+                problems.append(f"类别 {cat.get('name')} 应有 {per} 件, 实际 {len(objs)}")
+            if cat.get("id") not in bin_ids:
+                problems.append(f"类别 {cat.get('id')} 没有同名料盒")
+            ids.extend(f"{cat['id']}:{o['id']}" for o in objs)
+        if len(ids) != len(set(ids)):
+            problems.append("赛道二工件 id 在类别内重复")
+        if pick * len(cats) != self.t2_objects_per_round:
+            problems.append("objects_per_round 不等于 类别数 × 每类抽取数")
+        fails = []
+        for seed in range(40):
+            rng = random.Random(seed)
+            picked, withheld = self.sample_track2(rng)
+            if len(picked) != self.t2_objects_per_round or len(withheld) != len(cats):
+                fails.append(seed)
+                continue
+            placed = self.pack_track2(picked, rng)
+            if not placed or len(placed) != len(picked):
+                fails.append(seed)
+                continue
+            if not self._packed_ok(placed):
+                fails.append(seed)
+        if fails:
+            problems.append(f"赛道二装箱失败的种子: {fails[:8]}"
+                            + (" ..." if len(fails) > 8 else ""))
+        return problems
+
+    def _packed_ok(self, placed: List[Dict]) -> bool:
+        gap = self.t2_min_gap - 1e-6
+        area = self.scatter
+        boxes = []
+        for it in placed:
+            x, y = it["xy"]
+            sx, sy, _sz = it["world_dims"]
+            box = Box((x, y), (sx, sy))
+            if not area.contains(x, y):
+                return False
+            if (box.x_range[0] < area.x_range[0] - 1e-6 or box.x_range[1] > area.x_range[1] + 1e-6
+                    or box.y_range[0] < area.y_range[0] - 1e-6 or box.y_range[1] > area.y_range[1] + 1e-6):
+                return False
+            r = radius(x, y)
+            if r < self.r_min or r > self.r_max:
+                return False
+            boxes.append(box)
+        for i, a in enumerate(boxes):
+            for b in boxes[i + 1:]:
+                gx = min(a.x_range[1], b.x_range[1]) - max(a.x_range[0], b.x_range[0])
+                gy = min(a.y_range[1], b.y_range[1]) - max(a.y_range[0], b.y_range[0])
+                # 分离轴: 至少在一个方向上留出 gap
+                sep_x = -gx
+                sep_y = -gy
+                if sep_x < gap and sep_y < gap:
+                    return False
+        return True
 
 
 GRIPPER_ENV = "JAKA_GRIPPER"

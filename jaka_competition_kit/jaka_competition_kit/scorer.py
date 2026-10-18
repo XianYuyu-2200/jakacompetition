@@ -56,6 +56,7 @@ class Scorer(rclpy.node.Node):
         self.order_ptr = 0
         self.collected: List[Dict] = []
         self.out_of_order: List[Dict] = []
+        self.misplaced: List[Dict] = []
         self.dropped: List[Dict] = []
         self.collisions = 0
         self.interventions = 0
@@ -151,6 +152,21 @@ class Scorer(rclpy.node.Node):
         self.holding = obj_id
         self._log(f"抓取 {obj_id} (距真值 {d*1000:.0f}mm)")
 
+    def _bin_containing(self, pose, tol: float) -> Optional[Dict]:
+        """释放点落在哪只料盒里。赛道一只有 ``bin``, 赛道二是 ``bins``。"""
+        bins = list(self.scene.get("bins") or [])
+        if not bins and self.scene.get("bin"):
+            bins = [self.scene["bin"]]
+        x, y, z = pose[0], pose[1], pose[2]
+        for b in bins:
+            center = b.get("center", [0, 0])
+            size = b.get("size", [0, 0])
+            if (abs(x - center[0]) <= size[0] / 2 - tol
+                    and abs(y - center[1]) <= size[1] / 2 - tol
+                    and z >= 0.0):
+                return b
+        return None
+
     def _handle_release(self, ev: Dict):
         if self.state != "running":
             return
@@ -164,20 +180,16 @@ class Scorer(rclpy.node.Node):
         if truth is None:
             return
 
-        bin_cfg = self.scene.get("bin", {})
-        center = bin_cfg.get("center", [0, 0])
-        size = bin_cfg.get("size", [0, 0])
         tol = self.rules["tolerance"]["bin_xy_m"]
-        inside = (abs(pose[0] - center[0]) <= size[0] / 2 - tol
-                  and abs(pose[1] - center[1]) <= size[1] / 2 - tol
-                  and pose[2] >= 0.0)
-        if not inside:
+        hit = self._bin_containing(pose, tol)
+        if hit is None:
             self.dropped.append({"id": obj_id, "t": self.elapsed(),
                                  "pose": list(pose)})
             self._log(f"{obj_id} 释放点不在料盒内, 判掉落")
             return
 
-        entry = {"id": obj_id, "t": self.elapsed(), "label": truth.get("label", "")}
+        entry = {"id": obj_id, "t": self.elapsed(), "label": truth.get("label", ""),
+                 "bin_id": hit.get("id", "")}
         if self.track == 1:
             station = truth.get("station")
             expected = (self.correct_order[self.order_ptr]
@@ -193,8 +205,17 @@ class Scorer(rclpy.node.Node):
                 self.out_of_order.append(entry)
                 self._log(f"✘ 工位{station} 入盒但顺序错误(期望 {expected})")
         else:
-            self.collected.append(entry)
-            self._log(f"✔ {truth.get('label','')} 入盒 ({len(self.collected)} 件)")
+            expected = truth.get("bin_id")
+            entry["expected_bin"] = expected
+            if expected and hit.get("id") != expected:
+                self.misplaced.append(entry)
+                self._log(f"✘ {truth.get('label','')} 放入了"
+                          f"{hit.get('name', hit.get('id'))}盒"
+                          f"(应放入{truth.get('category_name', expected)}盒), 不计分")
+            else:
+                self.collected.append(entry)
+                self._log(f"✔ {truth.get('label','')} 放入"
+                          f"{hit.get('name', '')}盒 ({len(self.collected)} 件)")
 
         if self._all_collected():
             self._finish("全部工件入盒")
@@ -244,7 +265,7 @@ class Scorer(rclpy.node.Node):
     def _reset_round(self):
         self.t_start = self.t_end = None
         self.order_ptr = 0
-        self.collected, self.out_of_order, self.dropped = [], [], []
+        self.collected, self.out_of_order, self.misplaced, self.dropped = [], [], [], []
         self.collisions = self.interventions = 0
         self.holding = None
         self.log = []
@@ -307,6 +328,7 @@ class Scorer(rclpy.node.Node):
             "collected": self.collected,
             "collected_count": n_ok,
             "out_of_order": self.out_of_order,
+            "misplaced": self.misplaced,
             "dropped": self.dropped,
             "collisions": self.collisions,
             "interventions": self.interventions,
@@ -350,7 +372,8 @@ class Scorer(rclpy.node.Node):
             lines.append(f"  正确入盒顺序: {''.join(got) if got else '(无)'}")
         lines += [
             f"  成功入盒: {s['collected_count']} 件",
-            f"  错序: {len(s['out_of_order'])} 件   掉落: {len(s['dropped'])} 件",
+            f"  错序: {len(s['out_of_order'])} 件   "
+            f"错类: {len(s.get('misplaced', []))} 件   掉落: {len(s['dropped'])} 件",
             f"  碰撞: {s['collisions']} 次   人工干预: {s['interventions']} 次",
             "-" * 52,
             f"  基础分   {sc['base']:>7.1f}",

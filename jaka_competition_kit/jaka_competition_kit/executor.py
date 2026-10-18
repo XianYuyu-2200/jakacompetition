@@ -30,7 +30,7 @@ from .arena import Arena, Box
 from .backend import MoveGroupBackend
 from .gripper import Gripper
 from .backend import MoveResult
-from .scene import SceneClient, box_object
+from .scene import SceneClient, box_object, cylinder_object
 
 
 class Executor:
@@ -166,23 +166,32 @@ class Executor:
         return False
 
     def grasp(self, object_id: str, size: float, obj_world_xyz,
-              obj_quat=(0.0, 0.0, 0.0, 1.0)) -> bool:
+              obj_quat=(0.0, 0.0, 0.0, 1.0), dims=None, shape: str = "box",
+              grasp_width: Optional[float] = None) -> bool:
         """闭合夹爪, 并把工件按**真实世界位姿**附着到末端。
 
         关键:必须显式算出工件相对 TCP 的位姿再 attach。
         只给 id 的话 MoveIt 会认为物体位姿是相对末端的, 把物体中心放到 TCP
         原点上, 立刻和法兰重叠, 之后所有规划都返回 INVALID_MOTION_PLAN。
+
+        ``size`` 是竖直高度(算抓取高度用)。``grasp_width`` 是手指要夹的宽度,
+        缺省等于 ``size``(赛道一的立方体)。``dims`` 是世界系下的 (x, y, z)。
         """
         # 夹爪按工件实际宽度收 —— 仿真里没有堵转保护, 不告诉它尺寸手指
         # 会直接穿过工件(真机靠堵转自停, 传不传都一样)
-        self.gripper.close(object_size=size)
+        self.gripper.close(object_size=size if grasp_width is None else grasp_width)
         self.wait_until_settled()
         tcp_xyz, tcp_quat = self.tcp_pose()
         rel = _relative_pose(tcp_xyz, tcp_quat,
                              np.asarray(obj_world_xyz, float),
                              np.asarray(obj_quat, float))
-        prim = box_object(object_id, self.arena.tcp_link, (0, 0, 0),
-                          (size, size, size))
+        if shape == "cylinder":
+            h = float(dims[2]) if dims is not None else size
+            rad = float(dims[0]) / 2.0 if dims is not None else size / 2.0
+            prim = cylinder_object(object_id, self.arena.tcp_link, (0, 0, 0), rad, h)
+        else:
+            d = tuple(dims) if dims is not None else (size, size, size)
+            prim = box_object(object_id, self.arena.tcp_link, (0, 0, 0), d)
         ok = self.scene.attach_at(object_id, self.arena.tcp_link, prim, rel,
                                   touch_links=self.arena.touch_links)
         if not ok:
@@ -202,6 +211,26 @@ class Executor:
                           z if z is not None else self.pre_grasp_z,
                           "to_bin", straight=True)
 
+    def _finger_contacts(self, allowed: bool) -> None:
+        """下降/抬起时手指必然会挨到目标件和紧挨着的邻居。
+
+        散放区间隙只有 10mm, 指片外沿比这个宽, 规划器会把"指尖挨着邻件"
+        判成碰撞, 竖直下降一步都走不了。这里只在这段进出散放区的动作里
+        放开手指和工件的碰撞, 转场去料盒之前再收回来。
+        """
+        snap = self.scene.snapshot_ids()
+        if snap is None:
+            return
+        world, attached = snap
+        ids = [i for i in list(world) + list(attached)
+               if str(i).startswith("wp_") or str(i).startswith("bin_")]
+        if not ids:
+            return
+        ok = self.scene.set_pairs_allowed(
+            ["gripper_jaw_l", "gripper_jaw_r", "gripper_base"], ids, allowed)
+        if not ok:
+            self.node.get_logger().warn("更新手指碰撞豁免失败")
+
     def recover(self, drop_object: Optional[str] = None,
                 restore: Optional[Tuple[float, float, float, float]] = None) -> None:
         """一次尝试失败后的复位。
@@ -220,9 +249,11 @@ class Executor:
             except Exception:                            # noqa: BLE001
                 pass
             if restore is not None:
-                x, y, z_bottom, size = restore
+                x, y, z_bottom, size = restore[:4]
+                dims = restore[4] if len(restore) > 4 else None
+                shape = restore[5] if len(restore) > 5 else "box"
                 self.scene.put_back(drop_object, self.arena.frame_id,
-                                    (x, y, z_bottom), size)
+                                    (x, y, z_bottom), size, dims=dims, shape=shape)
             else:
                 self.scene.detach_any([drop_object])
             self.emit("abort", object_id=drop_object)
@@ -235,7 +266,9 @@ class Executor:
     def pick_and_place(self, object_id: str, x: float, y: float,
                        grasp_tcp_z: float, object_center_z: float, size: float,
                        bin_box: Box, release_z: float,
-                       approach_z: Optional[float] = None) -> bool:
+                       approach_z: Optional[float] = None,
+                       dims=None, shape: str = "box",
+                       grasp_width: Optional[float] = None) -> bool:
         """一次完整的抓取投放: 预抓取 -> 下降 -> 闭合 -> 抬起 -> 到料盒 -> 松开。
 
         任何一步失败都会调用 recover() 摘掉工件并退回安全高度;
@@ -297,53 +330,55 @@ class Executor:
             self.last_failure = "unreachable"
             return False
 
-        # 工件原始底面高度: 复位时按它放回原位
+        # 工件原始底面高度: 复位时按它放回原位。size 是竖直高度。
         z_bottom = object_center_z - size / 2.0
-        back = (x, y, z_bottom, size)
+        back = (x, y, z_bottom, size, dims, shape)
         if not self.approach(x, y, az).ok:
             self.last_failure = "motion"
             self.recover()
             return False
         # 下降和抬起对称, 也走笛卡尔直线: 关节空间规划在手腕奇异附近可能
         # 换 IK 分支, 末端划一道弧线出来(工件蹭到邻居 / 工位板)。
+        self._finger_contacts(True)
         if not self._move(x, y, grasp_tcp_z, "descend", straight=True).ok:
             self.last_failure = "motion"
             self.recover()
+            self._finger_contacts(False)
             return False
-        if not self.grasp(object_id, size, (x, y, object_center_z)):
+        if not self.grasp(object_id, size, (x, y, object_center_z),
+                          dims=dims, shape=shape, grasp_width=grasp_width):
             self.last_failure = "motion"
             self.recover()
+            self._finger_contacts(False)
             return False
         # 抬升: 够得到就一步竖直抬到转场高度; 长末端够不到就走 L 形三段。
+        lifted = False
         if pull is None:
-            if not self._move(x, y, tz, "lift", straight=True).ok:
-                self.last_failure = "motion"
-                self.recover(object_id, back)
-                return False
+            lifted = self._move(x, y, tz, "lift", straight=True).ok
         else:
-            if not self._move(x, y, pull[2], "lift", straight=True).ok:
-                self.last_failure = "motion"
-                self.recover(object_id, back)
-                return False
-            if not self._move(pull[0], pull[1], pull[2], "pull", straight=True).ok:
-                self.last_failure = "motion"
-                self.recover(object_id, back)
-                return False
-            if not self._move(pull[0], pull[1], tz, "lift2", straight=True).ok:
-                self.last_failure = "motion"
-                self.recover(object_id, back)
-                return False
+            lifted = (self._move(x, y, pull[2], "lift", straight=True).ok
+                      and self._move(pull[0], pull[1], pull[2], "pull", straight=True).ok
+                      and self._move(pull[0], pull[1], tz, "lift2", straight=True).ok)
+        if not lifted:
+            self.last_failure = "motion"
+            self.recover(object_id, back)
+            self._finger_contacts(False)
+            return False
+        # 手指进料盒时会挨到侧墙, 豁免保持到抬出料盒为止
         if not self.go_to_bin(bin_box, tz).ok:
             self.last_failure = "motion"
             self.recover(object_id, back)
+            self._finger_contacts(False)
             return False
         if not self._move(bin_box.center[0], bin_box.center[1], release_z,
                           "place", straight=True).ok:
             self.last_failure = "motion"
             self.recover(object_id, back)
+            self._finger_contacts(False)
             return False
         self.release(object_id, bin_box)
         self._move(bin_box.center[0], bin_box.center[1], tz, "retreat", straight=True)
+        self._finger_contacts(False)
         return True
 
 

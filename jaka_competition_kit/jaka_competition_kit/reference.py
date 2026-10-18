@@ -115,12 +115,14 @@ class ReferenceBase(rclpy.node.Node):
         if not objects:
             self.get_logger().error("没有可抓的工件, 退出")
             return
-        bin_box = (self.arena.track1_bin if self.scene.get("track") == 1
-                   else self.arena.track2_bin)
         t0 = time.time()
         ok = 0
         total = len(objects)
         for k, obj in enumerate(objects, 1):
+            if self.scene.get("track") == 1:
+                bin_box = self.arena.track1_bin
+            else:
+                bin_box = self.arena.track2_bin_by_id(obj["bin_id"])["box"]
             x, y = obj["xy"]
             r = (x ** 2 + y ** 2) ** 0.5
             tag = f"工位{obj['station']} " if obj.get("station") else ""
@@ -139,7 +141,9 @@ class ReferenceBase(rclpy.node.Node):
             for attempt in range(3):
                 good = self.arm.pick_and_place(
                     obj["id"], x, y, obj["grasp_tcp_z"], obj["z"], obj["size"],
-                    bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"])
+                    bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"],
+                    dims=obj.get("dims"), shape=obj.get("shape", "box"),
+                    grasp_width=obj.get("grasp_width"))
                 if good:
                     break
                 if self.arm.last_failure == "unreachable":

@@ -143,23 +143,58 @@ track1:
     - {id: cone,     name: 圆台,     size: 0.050}
 
 track2:
+  # 散放区 x[-190,190] y[190,365] mm。
+  #   最近点 (0,190)    r = 190mm  -> 在下界 180mm 之外
+  #   最远角 (190,365)  r = 411mm  -> 距上界 420mm 留 9mm
+  # 380×175mm 用货架装箱(长边沿 +x、间隙 10mm)可以稳定放下 16 件。
+  # 四个料盒分列左右、靠近基座, 和散放区只在 x 上错开, 不会同时挡路。
   scatter:
-    # 矩形散放区 x[-175,175] y[190,350] mm。
-    #   最近点 (0,190)      r = 190mm  -> 在下界 180mm 之外, 且不在基座本体上
-    #   最远角 (175,350)    r = 391mm  -> 距上界 420mm 留 29mm 余量
-    # 注意: 判据是"最近点"而不是"近角"。若取 center_y=230/size_y=250,
-    # 近边中点 (0,105) 只有 r=105mm —— 落在基座回转体里, 抓不到;
-    # MoveIt 用 /compute_ik 实测该点确实无解(见 design/scatter_probe.py)。
-    # 还要管"预抓取高度": 工件越高, 预抓取点越高(z=size+81mm), 可达半径越小。
-    # 本区间在 z=166mm 处实测仍整块可达。
-    center: [0.0, 0.270]
-    size: [0.350, 0.160]   # x 向 350mm, y 向 160mm
-  bin:
-    center: [0.310, 0.200]
-    size: [0.200, 0.150]
-    height: 0.100
+    center: [0.0, 0.2775]
+    size: [0.380, 0.175]
+  # 每类一只料盒。外尺寸 130×110×40, 侧墙 10mm, 内腔 110×90。
+  # 一轮每类恰好 4 件, 投放点在盒心; 入盒后工件从规划场景移除。
+  bins:
+    - {id: life,  name: 生活, center: [ 0.270, 0.125], size: [0.130, 0.110], height: 0.040}
+    - {id: tool,  name: 工具, center: [-0.270, 0.125], size: [0.130, 0.110], height: 0.040}
+    - {id: toy,   name: 玩具, center: [ 0.270, 0.245], size: [0.130, 0.110], height: 0.040}
+    - {id: fruit, name: 水果, center: [-0.270, 0.245], size: [0.130, 0.110], height: 0.040}
   objects_total: 20
-  objects_per_round: 12
-  min_gap: 0.010           # 工件之间最小间隙
-  object_size_range: [0.035, 0.075]
-  # release_z 由 release_tcp_z() 按工件尺寸算
+  per_category: 5
+  pick_per_category: 4          # 每类 5 选 4
+  objects_per_round: 16         # 4 类 × 4
+  min_gap: 0.010
+  # dims: 箱子是 [长, 宽, 高] 米; 圆柱是 [直径, 直径, 高]。
+  # 高 ≤40mm, 可夹宽度(短边)落在柔性爪 24–70mm 里。长边装箱时沿 +x。
+  categories:
+    - id: life
+      name: 生活
+      objects:
+        - {id: bottle, name: 方形旅行分装瓶, shape: box, dims: [0.064, 0.040, 0.038]}
+        - {id: tissue, name: 迷你硬质抽纸盒, shape: box, dims: [0.066, 0.044, 0.040]}
+        - {id: soap,   name: 椭圆香皂,       shape: box, dims: [0.058, 0.040, 0.034]}
+        - {id: sponge, name: 洗碗海绵块,     shape: box, dims: [0.062, 0.042, 0.034]}
+        - {id: mouse,  name: 迷你无线鼠标,   shape: box, dims: [0.068, 0.044, 0.036]}
+    - id: tool
+      name: 工具
+      objects:
+        - {id: driver,      name: 短柄绝缘螺丝刀, shape: box, dims: [0.070, 0.032, 0.032]}
+        - {id: pliers_nose, name: 迷你尖嘴钳,     shape: box, dims: [0.068, 0.034, 0.030]}
+        - {id: pliers_cut,  name: 迷你斜口钳,     shape: box, dims: [0.066, 0.036, 0.032]}
+        - {id: tape,        name: 闭合钢卷尺,     shape: box, dims: [0.046, 0.046, 0.030]}
+        - {id: brush,       name: 短柄油漆刷,     shape: box, dims: [0.068, 0.034, 0.032]}
+    - id: toy
+      name: 玩具
+      objects:
+        - {id: brick, name: 大颗粒积木块, shape: box, dims: [0.048, 0.032, 0.036]}
+        - {id: duck,  name: 小黄鸭,       shape: box, dims: [0.050, 0.044, 0.040]}
+        - {id: car,   name: 玩具小车,     shape: box, dims: [0.064, 0.034, 0.032]}
+        - {id: plush, name: 短毛毛绒方块, shape: box, dims: [0.046, 0.046, 0.040]}
+        - {id: dino,  name: 塑料小恐龙,   shape: box, dims: [0.060, 0.034, 0.038]}
+    - id: fruit
+      name: 水果
+      objects:
+        - {id: apple,  name: 苹果,   shape: cylinder, dims: [0.050, 0.050, 0.040]}
+        - {id: orange, name: 橙子,   shape: cylinder, dims: [0.048, 0.048, 0.038]}
+        - {id: lemon,  name: 柠檬,   shape: box,      dims: [0.060, 0.040, 0.038]}
+        - {id: pear,   name: 梨,     shape: box,      dims: [0.048, 0.044, 0.040]}
+        - {id: kiwi,   name: 猕猴桃, shape: box,      dims: [0.056, 0.040, 0.036]}

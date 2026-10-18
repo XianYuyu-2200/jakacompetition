@@ -132,7 +132,7 @@ class PickDemo(Node):
                 line += f"✔ 用时 {dt_all:.2f}s"
             print(line)
         print(f"\n配置: 速度缩放={VEL}, 规划尝试={ATTEMPTS}, 规划时限={ALLOWED}s")
-        print(f"成功抓取 {ok_cnt}/6, 总耗时 {total:.2f}s (限时 90s)")
+        print(f"成功抓取 {ok_cnt}/6, 总耗时 {total:.2f}s (早期骨架; 现行赛道一限时 145s, 见 rules.yaml)")
         return ok_cnt
 
 
