@@ -20,6 +20,7 @@ codex-competition/
 ├── setup/                  一键安装/打补丁/编译/启动脚本
 ├── verification/           仿真验证脚本 + 实测截图
 ├── dual_arm_demo/          双臂 operator/tracking 演示(基于本机械臂)
+├── perception/track2_yolo/ 赛道二 20 类 YOLO11(采集 / 训练 / 识别)
 └── extras_linkerhand/      LinkerHand 灵巧手 ROS 2 SDK(末端执行器, 可选)
 ```
 
@@ -171,6 +172,8 @@ python3 verification/moveit_plan_exec.py 0.4,0.9,-1.1,0,1.0,0.6
 
 **verification/** — 验证脚本(URDF/FK 交叉验证、MoveIt 规划执行、姿态发布、
 抓屏转 PNG)和实测截图。
+
+**perception/track2_yolo/** — 赛道二固定 20 类的 YOLO11 检测（采集、按批次划分、训练、识别）。类别编号来自 `arena.yaml`，用法看这个目录里的 README。图和权重不进仓库。
 
 **dual_arm_demo/** — 原 `jaka_dual_readonly`,用两台 JAKA mini 做的
 operator(192.168.0.101)/ tracking(192.168.0.102)只读跟随实验代码。

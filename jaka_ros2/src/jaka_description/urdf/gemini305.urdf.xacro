@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Gemini 305，装在 dummy_tcp 的 −Y 侧。数字只读 config/gemini305.yaml。 -->
+  <xacro:macro name="gemini305" params="parent">
+    <xacro:property name="cam"
+                    value="${xacro.load_yaml('$(find jaka_competition_kit)/config/gemini305.yaml')}"/>
+    <link name="gemini305_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${cam['mass']}"/>
+        <inertia ixx="1.30e-5" ixy="0" ixz="0" iyy="1.30e-5" iyz="0" izz="2.00e-5"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cam['size'][0]} ${cam['size'][1]} ${cam['size'][2]}"/>
+        </geometry>
+        <material name="gemini305_body"><color rgba="0.15 0.16 0.18 1"/></material>
+      </visual>
+      <!-- 镜头在光学 +Z 那一面，方便在 Gazebo 里认出朝向 -->
+      <visual>
+        <origin xyz="0 0 ${cam['size'][2] / 2.0}" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.012 0.012 0.002"/>
+        </geometry>
+        <material name="gemini305_lens"><color rgba="0.15 0.55 0.85 1"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cam['size'][0]} ${cam['size'][1]} ${cam['size'][2]}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="gemini305_joint" type="fixed">
+      <origin xyz="${cam['xyz'][0]} ${cam['xyz'][1]} ${cam['xyz'][2]}"
+              rpy="${cam['rpy'][0]} ${cam['rpy'][1]} ${cam['rpy'][2]}"/>
+      <parent link="${parent}"/>
+      <child link="gemini305_link"/>
+    </joint>
+
+    <!--
+      gemini305_link 用 ROS 光学坐标（+Z 朝前，+X 向右，+Y 向下）。
+      Ignition 的相机沿传感器 +X 看、+Z 朝上。
+      传感器相对 link 的 rpy="0 -pi/2 pi/2" 把这两者对齐，TF 不再另加 optical frame。
+    -->
+    <gazebo reference="gemini305_link">
+      <sensor name="gemini305" type="rgbd_camera">
+        <pose>0 0 0 0 -1.57079632679 1.57079632679</pose>
+        <always_on>1</always_on>
+        <update_rate>${cam['update_rate']}</update_rate>
+        <visualize>false</visualize>
+        <topic>${cam['topic']}</topic>
+        <camera>
+          <horizontal_fov>${cam['horizontal_fov']}</horizontal_fov>
+          <image>
+            <width>${int(cam['width'])}</width>
+            <height>${int(cam['height'])}</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>${cam['near']}</near>
+            <far>${cam['far']}</far>
+          </clip>
+        </camera>
+        <ignition_frame_id>gemini305_link</ignition_frame_id>
+      </sensor>
+      <material>Gazebo/DarkGrey</material>
+    </gazebo>
+  </xacro:macro>
+</robot>

@@ -34,6 +34,9 @@
 !jaka_ros2/jaka_ros2_documentation.md
 !jaka_ros2/jaka_ros2_documentation-中文版.md
 !jaka_ros2/release_notes.md
+!perception/track1_sim/README.md
+!perception/track2_yolo/README.md
+!design/腕部Gemini305.md
 
 # 仍然不提交:
 #   competition-初稿-已归档.md     已被定稿取代, 发布只会让人照错的规则做
@@ -63,3 +66,29 @@ design/.vendor/
 
 # MuJoCo 本地虚拟环境，不提交
 mujoco/.venv/
+
+# ================= 赛道二视觉 =================
+# 虚拟环境、采集的图、训练曲线和权重都不提交。
+# 类别编号在 perception/track2_yolo/classes.py, 不要把绝对路径写进仓库。
+perception/track2_yolo/.venv/
+perception/track2_yolo/runs/
+perception/track2_yolo/weights/
+perception/track2_yolo/dataset/incoming/
+perception/track2_yolo/dataset/images/
+perception/track2_yolo/dataset/labels/
+perception/track2_yolo/dataset/track2.yaml
+perception/track2_yolo/dataset/**/*.cache
+perception/track2_yolo/**/*.pt
+
+# 基础组仿真练习数据。脚本会重新采集，图片和权重不进 git。
+perception/track1_sim/dataset/incoming/*
+!perception/track1_sim/dataset/incoming/.gitkeep
+perception/track1_sim/dataset/images/
+perception/track1_sim/dataset/labels/
+perception/track1_sim/runs/
+perception/track1_sim/**/*.pt
+perception/track1_sim/dataset/track1.local.yaml
+perception/track1_sim/pose_daemon
+# 预览节点写出的图，不进仓库。
+design/gemini305_preview/
+design/track1_recognize/

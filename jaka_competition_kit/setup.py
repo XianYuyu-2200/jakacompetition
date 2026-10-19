@@ -26,6 +26,8 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         (os.path.join("share", package_name, "config"), _data("config/*")),
         (os.path.join("share", package_name, "launch"), _data("launch/*")),
+        (os.path.join("share", package_name, "worlds"), _data("worlds/*")),
+        (os.path.join("share", package_name, "worlds", "meshes"), _data("worlds/meshes/*")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -42,6 +44,8 @@ setup(
             "arena_check = jaka_competition_kit.arena_check:main",
             "qr_tool = jaka_competition_kit.qr_tool:main",
             "gz_scene = jaka_competition_kit.gz_scene:main",
+            "gemini305_preview = jaka_competition_kit.gemini305_preview:main",
+            "track1_recognize = jaka_competition_kit.track1_recognize:main",
         ],
     },
 )

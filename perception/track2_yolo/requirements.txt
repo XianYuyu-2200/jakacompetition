@@ -1,0 +1,10 @@
+# 赛道二 YOLO11。用 perception/track2_yolo/.venv 安装, 不要装进系统 Python。
+# RTX 5060 Ti 是 sm_120, 驱动 580 对应 CUDA 13。下面的 torch 轮子会拉 CUDA 13,
+# 不要改成 cu124, 也不要装 CPU 版。
+torch==2.14.1
+torchvision==0.29.1
+ultralytics==8.4.182
+opencv-python>=4.8
+PyYAML>=6
+Pillow>=10
+numpy>=1.23

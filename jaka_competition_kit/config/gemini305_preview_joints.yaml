@@ -1,0 +1,9 @@
+# 预览用：法兰在散放区中心 (0, 0.2775, 0.28)，工具竖直朝下。
+# 对应 tool_down_quat 绕 X 转 180°，相机在世界 +Y 侧（离开基座）。
+initial_positions:
+  joint_1: -1.5924
+  joint_2: 0.3627
+  joint_3: 0.9391
+  joint_4: 0.0
+  joint_5: 1.8398
+  joint_6: 1.5492

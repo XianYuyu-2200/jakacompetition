@@ -15,6 +15,11 @@
     <!-- Import jaka_minicobo urdf file -->
     <xacro:include filename="$(find jaka_description)/urdf/jaka_minicobo.urdf" />
 
+    <!-- 腕部 Gemini 305。固定安装，不随夹爪开关。 -->
+    <xacro:include filename="$(find jaka_description)/urdf/gemini305.urdf.xacro" />
+    <xacro:gemini305 parent="dummy_tcp"/>
+
+
     <!-- 末端夹爪(装在 dummy_tcp 上) -->
     <xacro:include filename="$(find wheeltec_gripper)/urdf/wheeltec_gripper.urdf.xacro" />
     <xacro:if value="$(arg with_gripper)">

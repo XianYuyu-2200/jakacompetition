@@ -1,0 +1,11 @@
+# 基础组 6 类。编号和 perception/track1_sim/shapes.py 一致。
+path: .
+train: images/train
+val: images/val
+names:
+  0: cube
+  1: rod
+  2: cylinder
+  3: hex
+  4: tri
+  5: cone

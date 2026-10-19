@@ -38,6 +38,7 @@
 | `_fonts.py` | 把系统 Noto Sans CJK 转成 TrueType 并缓存,供配图与 PDF 嵌入中文 |
 | `_docx_lib.py` | 按需加载 python-docx(本机无 pip 时自动从 PyPI 取 wheel 到 `.vendor/`) |
 | `fig_arena_track1.png` / `fig_arena_track2.png` / `fig_workspace.png` / `fig_flow.png` | 上一脚本生成的正式配图 |
+| `腕部Gemini305.md` | 腕部 Gemini 305 的安装设计。预览世界的 URDF 已经按这个装上 |
 
 ## 实测数据(全部可复现)
 
