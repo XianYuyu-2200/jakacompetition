@@ -118,7 +118,66 @@ class Executor:
         # 这里**不**走 LIN: 一局开始时机械臂处在零位(工具朝天, TCP 在 z≈0.77),
         # 和目标(工具朝下)差了 180° 姿态, 笛卡尔直线要边平移边翻转, 实测
         # 第一段 approach 从 3.3s 涨到 30.6s。转场交给关节规划(PTP)更快。
+        # 工具已经朝下之后不要用这个函数斜着扎到预抓取高度, 见 _approach_over。
         return self._move(x, y, z if z is not None else self.pre_grasp_z, "approach")
+
+    def _tool_points_down(self, quat) -> bool:
+        """工具轴是否已经大致朝下。朝天时不能走笛卡尔直线。"""
+        return float(_quat_to_matrix(np.asarray(quat, float))[2, 2]) < -0.5
+
+    def _sync_tcp(self) -> bool:
+        """用 TF 刷新末端位置和姿态。规划目标是绝对坐标, 不能靠上一次的缓存。"""
+        try:
+            xyz, quat = self.tcp_pose(timeout=1.0)
+        except RuntimeError:
+            return False
+        self.tcp_xyz = (float(xyz[0]), float(xyz[1]), float(xyz[2]))
+        self._live_quat = np.asarray(quat, float)
+        return True
+
+    def _can_hover(self, x: float, y: float, z: float) -> bool:
+        top = self.arena.reach_top_z(x, y, margin=0.005)
+        return (not math.isnan(top)) and z <= top + 1e-9
+
+    def _approach_over(self, x: float, y: float, az: float, tz: float,
+                       pull: Optional[Tuple[float, float, float]]) -> MoveResult:
+        """工具已经朝下时: 先到转场高度, 水平直线过去, 再竖直降到预抓取。
+
+        从低处斜穿散放区时, 直线和 PTP 都会蹭到还在桌上的邻居, 接着就掉进
+        OMPL, 甩出一条大弧。开局工具朝天、或者目标正上方够不到这个高度时,
+        仍走 ``approach`` 的关节 PTP, 不强行做 180° 翻转的笛卡尔直线。
+        已经高于转场高度(识别位姿)时不在原地下降 —— 下降点可能就在工件正上方。
+        """
+        if not self._sync_tcp() or not self._tool_points_down(self._live_quat):
+            return self.approach(x, y, az)
+
+        cx, cy, cz = self.tcp_xyz
+        travel = max(cz, tz)
+        via_pull = False
+        dest = (x, y)
+        if not self._can_hover(x, y, travel):
+            if pull is not None and self._can_hover(pull[0], pull[1], travel):
+                via_pull = True
+                dest = (pull[0], pull[1])
+            else:
+                self.node.get_logger().info(
+                    f"    工位正上方到不了 {travel * 1000:.0f}mm, 这段仍走关节规划")
+                return self.approach(x, y, az)
+
+        self.node.get_logger().info(
+            f"    转场先保持 {travel * 1000:.0f}mm 再横移, 不从低处斜穿")
+        if travel - cz > 0.002:
+            lifted = self._move(cx, cy, travel, "clear", straight=True)
+            if not lifted.ok:
+                return self.approach(x, y, az)
+            cx, cy, _cz = self.tcp_xyz
+        if math.hypot(dest[0] - cx, dest[1] - cy) > 0.002:
+            moved = self._move(dest[0], dest[1], travel, "transit", straight=True)
+            if not moved.ok:
+                return moved
+        if via_pull or abs(az - travel) > 0.002:
+            return self._move(x, y, az, "approach", straight=True)
+        return MoveResult(True, 1, 0.0, via="cartesian")
 
     def descend(self, z: float):
         x, y, _ = self.tcp_xyz
@@ -268,7 +327,8 @@ class Executor:
                        bin_box: Box, release_z: float,
                        approach_z: Optional[float] = None,
                        dims=None, shape: str = "box",
-                       grasp_width: Optional[float] = None) -> bool:
+                       grasp_width: Optional[float] = None,
+                       obstacle_top_z: Optional[float] = None) -> bool:
         """一次完整的抓取投放: 预抓取 -> 下降 -> 闭合 -> 抬起 -> 到料盒 -> 松开。
 
         任何一步失败都会调用 recover() 摘掉工件并退回安全高度;
@@ -280,7 +340,8 @@ class Executor:
         #   tz —— 抬着工件在场地里走时 TCP 该到的高度。必须让手里的工件
         #         越过料盒侧墙和旁边工件的顶面, 否则规划器会绕出一条大弧
         #         (实测末端从 135mm 拱到 354mm)。见 Arena.transfer_tcp_z()。
-        tz = self.arena.transfer_tcp_z(grasp_tcp_z, size, bin_box)
+        tz = self.arena.transfer_tcp_z(
+            grasp_tcp_z, size, bin_box, obstacle_top_z=obstacle_top_z)
 
         # ---- 可达性预检: 够不到的位姿**不发指令** ----
         # 悬停高度只是个余量, 压到该半径够得到的最高点即可(IK 一定有解,
@@ -333,7 +394,7 @@ class Executor:
         # 工件原始底面高度: 复位时按它放回原位。size 是竖直高度。
         z_bottom = object_center_z - size / 2.0
         back = (x, y, z_bottom, size, dims, shape)
-        if not self.approach(x, y, az).ok:
+        if not self._approach_over(x, y, az, tz, pull).ok:
             self.last_failure = "motion"
             self.recover()
             return False

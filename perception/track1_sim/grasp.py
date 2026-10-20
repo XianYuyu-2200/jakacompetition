@@ -154,6 +154,21 @@ SHAPE_BY_ID = {s.id: s for s in SHAPES}
 KNOWN = set(SHAPE_BY_ID)
 
 
+def practice_obstacle_top(arena, picks: list[dict]) -> float:
+    """这场练习要越过的高度。
+
+    练习料盒不在赛道一的 (0.315, 0.180) 上, 转场公式会按赛道二的矮工件算,
+    TCP 抬不够, 手里的工件底面还扫得到旁边那件。这里改用这 6 个模型的真实
+    顶面(深度偶尔偏高, 最多再信 10mm)。
+    """
+    nominal = max(shape.center_z + float(shape.bounds[5]) for shape in SHAPES)
+    sensed = nominal
+    if picks:
+        sensed = min(max(float(item["world"][2]) for item in picks), nominal + 0.010)
+    bin_top = float(arena.raw["table"]["top_z"]) + BIN_HEIGHT
+    return max(nominal, sensed, bin_top)
+
+
 def _package_dir() -> Path:
     return Path(__file__).resolve().parent
 
@@ -176,7 +191,8 @@ def load_joint_targets() -> dict[str, float]:
 def tool_quat(yaw: float) -> tuple[float, float, float, float]:
     """工具朝下，再绕世界 Z 转 yaw。yaw=0 时就是 arena 的 tool_down_quat。
 
-    手指轴在夹爪坐标系的 Y。朝下且 yaw=0 时，手指沿世界 Y 开合。
+    两片指绕工具 Y 转，沿工具 X 分开。Rx(π) 后工具 X 仍是世界 X，
+    所以 yaw=0 沿世界 X 开合，yaw=π/2 才转到世界 Y。
     """
     half = yaw / 2.0
     # Rz(yaw) * Rx(pi)，Rx(pi) 的四元数是 (1, 0, 0, 0)。
@@ -215,11 +231,6 @@ def _compose(parent_p, parent_q, child_p, child_q):
     rot = _quat_to_R(parent_q)
     pos = np.asarray(parent_p, float) + rot @ np.asarray(child_p, float)
     return pos, _mul_quat(parent_q, child_q)
-
-
-def yaw_quat(yaw: float) -> tuple[float, float, float, float]:
-    half = yaw / 2.0
-    return (0.0, 0.0, math.sin(half), math.cos(half))
 
 
 def pixels_to_world(u, v, z_opt, info) -> tuple[float, float, float] | None:
@@ -306,14 +317,20 @@ def top_of_box(depth: np.ndarray, xyxy, info):
     }
 
 
-def choose_pinch(extent_x: float, extent_y: float) -> tuple[float, float]:
-    """挑手指张得开的那个方向。yaw=0 沿世界 Y 夹，yaw=90° 沿世界 X 夹。"""
-    extent_x = min(max(extent_x, 0.02), 0.09)
-    extent_y = min(max(extent_y, 0.02), 0.09)
-    if extent_y <= extent_x or extent_y <= 0.064:
-        width = min(extent_y, 0.066)
-        return 0.0, max(0.024, width)
-    return math.pi / 2.0, max(0.024, min(extent_x, 0.066))
+def pinch_for_shape(shape) -> tuple[float, float]:
+    """夹短边，手指面贴着那一对侧面，不要穿进工件。
+
+    宽度用模型在开合方向上的真实尺寸，不用顶面深度框：圆台顶面比底面窄，
+    深度框还会把长方体量到 26mm。净距标定在离法兰 120mm 的截面，刀尖更远，
+    合深了会更窄，所以再加 3mm，指面停在工件外面。
+    """
+    span_x = float(shape.bounds[1] - shape.bounds[0])
+    span_y = float(shape.bounds[3] - shape.bounds[2])
+    slack = 0.003
+    limit = 0.066
+    if span_x <= span_y:
+        return 0.0, min(limit, max(0.024, span_x + slack))
+    return math.pi / 2.0, min(limit, max(0.024, span_y + slack))
 
 
 def run_yolo(image: Path, weights: Path, conf: float) -> list[dict]:
@@ -727,7 +744,7 @@ class LearnGrasp(Node):
             height = float(shape.bounds[5] - shape.bounds[4])
             bottom = max(z - height, 0.004)
             size = z - bottom
-            yaw, width = choose_pinch(top["extent_x"], top["extent_y"])
+            yaw, width = pinch_for_shape(shape)
             ex = min(max(top["extent_x"], 0.025), 0.090)
             ey = min(max(top["extent_y"], 0.025), 0.090)
             picks.append({
@@ -744,7 +761,8 @@ class LearnGrasp(Node):
                 "dims": (ex, ey, size),
                 "pinch_yaw": yaw,
                 "grasp_width": width,
-                "visual_quat": yaw_quat(top["yaw"]),
+                # 练习摆放是单位姿态。跟手时如果改用顶面主轴，网格会在合拢时自己转一下。
+                "visual_quat": (0.0, 0.0, 0.0, 1.0),
                 "rest_z": float(shape.center_z),
                 "model": f"shape_{sid}",
                 "object_id": f"wp_{sid}",
@@ -855,6 +873,9 @@ class LearnGrasp(Node):
         self._build_scene(picks, arena)
 
         bin_box = Box(BIN_CENTER, BIN_SIZE)
+        obstacle = practice_obstacle_top(arena, picks)
+        self.get_logger().info(
+            f"旁边工件顶面最高 {obstacle * 1000:.0f}mm, 转场会先抬过它们再横移")
         ok = 0
         for index, item in enumerate(picks, 1):
             x, y, top_z = item["world"]
@@ -865,7 +886,8 @@ class LearnGrasp(Node):
             self.get_logger().info(
                 f"[{index}/{len(picks)}] 工位{item['station']} {item['name']} "
                 f"顶面 ({x:.3f},{y:.3f},{top_z:.3f}) "
-                f"TCP {grasp_z:.3f} 夹持宽 {item['grasp_width']*1000:.0f}mm")
+                f"TCP {grasp_z:.3f} 夹持宽 {item['grasp_width']*1000:.0f}mm "
+                f"绕Z {math.degrees(item['pinch_yaw']):.0f}°")
             self._note(f"正在抓取 {index}/{len(picks)}  工位{item['station']} {item['name']}")
             spec = {
                 "id": item["object_id"],
@@ -881,7 +903,8 @@ class LearnGrasp(Node):
                 good = arm.pick_and_place(
                     item["object_id"], x, y, grasp_z, item["center"][2], item["size"],
                     bin_box, release, approach_z=approach, dims=item["dims"],
-                    shape="box", grasp_width=item["grasp_width"])
+                    shape="box", grasp_width=item["grasp_width"],
+                    obstacle_top_z=obstacle)
                 if good or arm.last_failure == "unreachable":
                     break
                 self.get_logger().warn(f"    第 {attempt + 1} 次没抓起来，再试一次")

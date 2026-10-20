@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -411,7 +411,8 @@ class Arena:
         return float(self.table["top_z"]) + self.track2_max_object_size
 
     def transfer_tcp_z(self, grasp_z: float, object_size: float,
-                       bin_box: Box) -> float:
+                       bin_box: Box,
+                       obstacle_top_z: Optional[float] = None) -> float:
         """**抬着工件转场**时 TCP 该到的高度。
 
         工件抓起来后挂在 TCP 下方 ``grasp_offset(size) + size`` 处(那是它的
@@ -438,6 +439,10 @@ class Arena:
         """
         margin = float(self.raw["tool"].get("transfer_margin", 0.010))
         obs = max(self.bin_top_z(bin_box), self.source_area_top_z(bin_box))
+        # 调用方知道场上还有更高的东西(练习料盒不在赛道一坐标上, 会误用
+        # 赛道二那批更矮的工件)时, 只许抬高, 不许把正式赛道的高度改低。
+        if obstacle_top_z is not None:
+            obs = max(obs, float(obstacle_top_z))
         return max(self.approach_z(grasp_z),
                    obs + margin + self.grasp_offset(object_size)
                    + object_size)

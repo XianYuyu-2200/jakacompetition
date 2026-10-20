@@ -32,6 +32,12 @@ PATS=(
   "[r]uby /usr/bin/ign"
   "[p]arameter_bridge"
   "[g]z_scene"
+  # learn:=true 另起的，不在 ros2 launch 的进程组里。留下会占识别窗口、
+  # 再抢 /world/.../set_pose，下一轮摆放和抓取会和上一轮叠在一起。
+  "[t]rack1_sim/grasp.py"
+  "[t]rack1_sim/pose_daemon"
+  "[t]rack1_sim/live_view.py"
+  "[t]rack1_sim/infer.py"
 )
 if [[ "${ALL}" == "1" ]]; then
   PATS+=("[r]os2 " "[r]os2-" "[r]os2cli" "[i]gn " "[r]uby")
