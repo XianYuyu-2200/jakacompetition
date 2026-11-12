@@ -394,7 +394,12 @@ class Arena:
 
     @property
     def track1_max_workpiece_size(self) -> float:
-        return max(float(w["size"]) for w in self.raw["track1"]["workpieces"])
+        def height(item):
+            if "size" in item:
+                return float(item["size"])
+            dims = item.get("dims", [])
+            return float(dims[2]) if len(dims) == 3 else 0.05
+        return max(height(w) for w in self.raw["track1"]["workpieces"])
 
     @property
     def track2_max_object_size(self) -> float:

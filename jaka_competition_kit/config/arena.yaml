@@ -137,12 +137,14 @@ track1:
   workpieces:
     # dims 按 x/y/z 记，必须与 MoveIt 碰撞体、Gazebo 镜像和抓取宽度一致。
     # 尺寸与 track1_shapes.py 的基础组视觉分类标准件一致。
-    - {id: cube,     name: 正方体,   shape: box,      dims: [0.050, 0.050, 0.050]}
-    - {id: rod,      name: 长方体,   shape: box,      dims: [0.078, 0.032, 0.040]}
-    - {id: cylinder, name: 圆柱体,   shape: cylinder, dims: [0.050, 0.050, 0.050]}
-    - {id: hex,      name: 六角柱,   shape: box,      dims: [0.050, 0.050, 0.050]}
-    - {id: tri,      name: 三角柱,   shape: box,      dims: [0.056, 0.048, 0.046]}
-    - {id: cone,     name: 圆台,     shape: cylinder, dims: [0.052, 0.052, 0.042]}
+    # 编号就是固定工位编号：1 长方体、2 正方体、3 圆柱体、4 球体、5 三棱柱、6 六棱柱。
+    # 参赛者不需要再识别类别；二维码只给出 1..6 的抓取顺序。
+    - {id: cuboid,          name: 长方体,   shape: box,      dims: [0.078, 0.032, 0.040]}
+    - {id: cube,            name: 正方体,   shape: box,      dims: [0.050, 0.050, 0.050]}
+    - {id: cylinder,        name: 圆柱体,   shape: cylinder, dims: [0.050, 0.050, 0.050]}
+    - {id: sphere,          name: 球体,     shape: sphere,   dims: [0.050, 0.050, 0.050]}
+    - {id: triangular_prism, name: 三棱柱,  shape: triangular_prism, dims: [0.056, 0.048, 0.046]}
+    - {id: hexagonal_prism,  name: 六棱柱,  shape: hexagonal_prism,  dims: [0.050, 0.050, 0.050]}
 
 track2:
   # 散放区 x[-190,190] y[190,365] mm。

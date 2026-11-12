@@ -1,6 +1,7 @@
 """二维码生成与解析。
 
-载荷格式: ``JAKA1-<6 位数字>``, 例如 ``JAKA1-246135`` 表示抓取顺序 2→4→6→1→3→5。
+载荷格式默认是 ``JAKA1-<6 位数字>``，例如 ``JAKA1-246135``；
+为兼容比赛现场直接打印六位数字的二维码，也接受裸数字 ``246135``。
 数字必须恰好是 1..6 的一个排列。
 """
 from __future__ import annotations
@@ -35,9 +36,13 @@ def payload(order: Sequence[int]) -> str:
 def parse(text: str) -> List[int]:
     """解析二维码文本;格式不合法直接抛 ValueError(裁判判定为无效)。"""
     text = (text or "").strip()
-    if not text.upper().startswith(PREFIX):
-        raise ValueError(f"二维码前缀不是 {PREFIX!r}: {text!r}")
-    digits = text[len(PREFIX):]
+    upper = text.upper()
+    if upper.startswith(PREFIX):
+        digits = text[len(PREFIX):]
+    elif len(text) == ORDER_LEN and text.isdigit():
+        digits = text
+    else:
+        raise ValueError(f"二维码应为 {PREFIX}<6位数字> 或直接 6 位数字: {text!r}")
     if len(digits) != ORDER_LEN or not digits.isdigit():
         raise ValueError(f"二维码内容必须是 {ORDER_LEN} 位数字: {text!r}")
     order = [int(c) for c in digits]

@@ -165,16 +165,17 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
     # 接收最佳努力发布的传感器，也兼容可靠发布者。
     sensors = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
     latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-    current = {"joint_at": 0.0, "joints": set(), "clock_at": 0.0,
+    current = {"joint_at": 0.0, "joints": set(), "joint_positions": {}, "clock_at": 0.0,
                "color_at": 0.0, "depth_at": 0.0, "controller_at": 0.0,
                "controllers": set(), "run_state": "idle", "scene": {}, "score": None,
                "image_jpeg": "", "image_seq": 0, "annotated_jpeg": "",
                "annotated_seq": 0, "detections": None, "detection_at": 0.0}
 
     def joint(msg):
-        valid = {name for name, position in zip(msg.name, msg.position)
-                 if math.isfinite(position)}
-        current.update(joints=valid, joint_at=time.monotonic())
+        positions = {name: float(position) for name, position in zip(msg.name, msg.position)
+                     if math.isfinite(position)}
+        current.update(joints=set(positions), joint_positions=positions,
+                       joint_at=time.monotonic())
 
     def stamp(key):
         return lambda _msg: current.update({key: time.monotonic()})
@@ -251,6 +252,8 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
         try:
             value = json.loads(msg.data)
             current["scene"] = {"seed": value.get("seed"), "qr_png": value.get("qr_png", ""),
+                                "qr_payload": value.get("qr_payload", ""),
+                                "qr_order": value.get("qr_order", []),
                                 "object_count": len(value.get("objects", []))}
             current["score"] = None
         except (ValueError, TypeError, AttributeError):
@@ -337,7 +340,9 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
             }
             checks = readiness(mode, facts, camera_required=camera_enabled)
             emit({"type": "status", "ready": all(c["level"] == "ok" for c in checks),
-                  "checks": checks,
+                  "checks": checks, "joint_positions":
+                  {name: current["joint_positions"].get(name) for name in sorted(ARM_JOINTS)
+                   if name in current["joint_positions"]},
                   "recognition": (current["detections"] if detection_fresh else None)
                                  if recognition else None,
                   **round_snapshot(current)})
@@ -352,6 +357,28 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
 
 
 
+def move_joints(values: list[float], velocity: float = 0.25) -> int:
+    """工作台受控的单次关节姿态运动，仅连接当前已 source 的仿真/ROS 会话。"""
+    import rclpy
+    from jaka_competition_kit.backend import MoveGroupBackend
+    rclpy.init()
+    node = rclpy.create_node("workbench_pose_move")
+    try:
+        if len(values) != 6 or any(not math.isfinite(float(v)) for v in values):
+            raise ValueError("必须提供 6 个有限关节角")
+        backend = MoveGroupBackend(node, vel_scale=float(velocity), acc_scale=float(velocity),
+                                   planning_attempts=2, allowed_planning_time=2.0)
+        result = backend.goto_joints([float(v) for v in values])
+        emit({"type": "pose-move", "success": bool(result.ok), "detail": str(result)})
+        return 0 if result.ok else 2
+    except Exception as exc:
+        emit({"type": "pose-move", "success": False, "detail": str(exc)})
+        return 2
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
 def close_reference_node(node) -> None:
     """复用既有 SceneClient 的清理顺序，避免后台执行线程先于资源销毁退出。"""
     try:
@@ -360,10 +387,13 @@ def close_reference_node(node) -> None:
         node.destroy_node()
 
 
-def reference(velocity: float) -> int:
+def reference(velocity: float, fixed_poses: str = "") -> int:
     import rclpy
     from jaka_competition_kit.ref_track1 import Track1Reference
-    rclpy.init(args=["--ros-args", "-p", "gripper:=sim", "-p", f"vel_scale:={velocity}"])
+    ros_args = ["--ros-args", "-p", "gripper:=sim", "-p", f"vel_scale:={velocity}"]
+    if fixed_poses:
+        ros_args += ["-p", f"fixed_poses_config:={fixed_poses}"]
+    rclpy.init(args=ros_args)
     node = None
     try:
         node = Track1Reference()
@@ -396,13 +426,19 @@ def main(argv=None):
     srv.add_argument("--timeout", type=float, default=15.0)
     ref = sub.add_parser("reference")
     ref.add_argument("--velocity", type=float, default=0.5)
+    ref.add_argument("--fixed-poses", default="")
+    pose = sub.add_parser("move-joints")
+    pose.add_argument("--joints", nargs=6, type=float, required=True)
+    pose.add_argument("--velocity", type=float, default=0.25)
     args = parser.parse_args(argv)
     try:
         if args.command == "monitor":
             return monitor(args.mode, camera=args.camera or args.recognition, recognition=args.recognition)
         if args.command == "service":
             return halt(args.timeout) if args.name == "halt" else service(args.name, args.timeout)
-        return reference(args.velocity)
+        if args.command == "move-joints":
+            return move_joints(args.joints, args.velocity)
+        return reference(args.velocity, args.fixed_poses)
     except Exception as exc:
         emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
         return 2

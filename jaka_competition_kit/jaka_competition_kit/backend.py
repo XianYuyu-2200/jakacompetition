@@ -523,6 +523,31 @@ class MoveGroupBackend:
                  use_ik: Optional[bool] = None) -> MoveResult:
         return self.goto((x, y, z), quat, plan_only, use_ik=use_ik)
 
+    def goto_joints(self, joints: Sequence[float], plan_only: bool = False,
+                    planner: Optional[str] = "PTP") -> MoveResult:
+        """按已记录的六关节姿态运动，不重新做末端 IK。
+
+        这是基础组调参后复用姿态的统一接口；仿真和真机都走同一套
+        MoveIt joint target。输入长度和有限性在这里校验，防止工作台把
+        半截/NaN 数据发送给控制器。
+        """
+        if len(joints) != len(self.joint_names):
+            return MoveResult(False, -7, 0.0, via="joint-invalid")
+        try:
+            vals = [float(v) for v in joints]
+        except (TypeError, ValueError):
+            return MoveResult(False, -7, 0.0, via="joint-invalid")
+        if any(not math.isfinite(v) for v in vals):
+            return MoveResult(False, -7, 0.0, via="joint-invalid")
+        cur = self.joint_state(timeout=0.5) or vals
+        move = max(abs(a - b) for a, b in zip(vals, cur))
+        t0 = time.time()
+        goal = self._goal_joint(vals, plan_only, planner=planner)
+        result = self._run(goal, t0, "fixed-joint")
+        if result.ok:
+            self._log_move(move, result)
+        return result
+
     # ---------- 直线运动 ----------
     def goto_xyz_straight(self, x: float, y: float, z: float,
                           quat: Sequence[float], max_step: float = 0.005,

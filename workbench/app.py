@@ -13,6 +13,8 @@ import subprocess
 import sys
 import time
 
+import yaml
+
 from PyQt5.QtCore import (QObject, QRunnable, QSettings, Qt, QThreadPool, QTimer,
                           QUrl, pyqtSignal)
 from PyQt5.QtGui import QColor, QDesktopServices, QFont, QImage, QPixmap
@@ -204,6 +206,7 @@ class WorkbenchWindow(QMainWindow):
         self.run_state = "idle"
         self.scene = {}
         self.score = None
+        self.joint_positions = {}
         self.last_status = 0.0
         self.stack_started = 0.0
         self._checking = False
@@ -396,16 +399,59 @@ class WorkbenchWindow(QMainWindow):
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
         cfg.addLayout(grid)
-        self.mode_description = _label("基础组 Gazebo 仿真；工件场景为规划场景镜像，当前不代表真实接触/摩擦夹持。RViz 默认关闭，可选轻量模式。", "muted")
+        self.mode_description = _label("基础组 Gazebo 仿真；固定位置放置六类物件，二维码只给出抓取顺序。工作台内置相机用于观察，不承担基础组物体分类。", "muted")
         cfg.addWidget(self.mode_description)
         layout.addWidget(card)
+        pose_card, pose_layout = _card("基础组固定姿态调参")
+        pose_layout.addWidget(_label(
+            "二维码只决定 1..6 的抓取顺序；物件位置和编号固定。调整仿真机械臂后，\n"
+            "记录的关节角会写入 track1_fixed_poses.yaml，完成全部姿态后官方基础模型会自动复用。\n"
+            "仿真数据是直观的初始参考，接入 JAKA Mini 2 真机仍需重新校准。", "muted"))
+        pose_grid = QGridLayout()
+        pose_grid.addWidget(_label("编号", "muted"), 0, 0)
+        self.pose_station = QSpinBox()
+        self.pose_station.setRange(1, 6)
+        self.pose_station.setValue(1)
+        pose_grid.addWidget(self.pose_station, 0, 1)
+        pose_grid.addWidget(_label("姿态阶段", "muted"), 0, 2)
+        self.pose_phase = QComboBox()
+        for label, value in (("预抓取（编号）", "object:approach"),
+                             ("抓取（编号）", "object:grasp"),
+                             ("抬升（编号）", "object:lift"),
+                             ("投放前（料盒）", "place:approach"),
+                             ("投放（料盒）", "place:release"),
+                             ("退出（料盒）", "place:retreat")):
+            self.pose_phase.addItem(label, value)
+        self.pose_phase.currentIndexChanged.connect(self._pose_phase_changed)
+        pose_grid.addWidget(self.pose_phase, 0, 3, 1, 3)
+        self.joint_spins = []
+        for i in range(6):
+            pose_grid.addWidget(_label(f"J{i + 1}", "muted"), 1, i)
+            spin = QDoubleSpinBox()
+            spin.setRange(-6.2832, 6.2832)
+            spin.setDecimals(4)
+            spin.setSingleStep(0.05)
+            spin.setSuffix(" rad")
+            self.joint_spins.append(spin)
+            pose_grid.addWidget(spin, 2, i)
+        pose_layout.addLayout(pose_grid)
+        pose_buttons = QHBoxLayout()
+        pose_buttons.addWidget(_button("读取当前关节角", self._read_current_joints))
+        pose_buttons.addWidget(_button("移动到输入姿态", self._move_to_pose))
+        pose_buttons.addWidget(_button("记录此姿态", self._record_pose, primary=True))
+        self.pose_status = _label("等待仿真关节状态。", "muted")
+        pose_buttons.addWidget(self.pose_status, 1)
+        pose_layout.addLayout(pose_buttons)
+        self.pose_file_label = _label("配置：track1_fixed_poses.yaml", "muted")
+        pose_layout.addWidget(self.pose_file_label)
+        layout.addWidget(pose_card)
         middle = QHBoxLayout()
         control, actions = _card("操作")
         action_grid = QGridLayout()
         self.check_button = _button("环境自检", self.check_now)
         self.launch_button = _button("启动环境", self.start_environment, primary=True)
         self.generate_button = _button("生成题目", self.generate)
-        self.reference_button = _button("运行参考程序", self.run_reference, primary=True)
+        self.reference_button = _button("运行官方基础模型", self.run_reference, primary=True)
         self.start_button = _button("发令 / 开始计时", self.start_round)
         self.stop_round_button = _button("停止本轮", self.stop_round, danger=True)
         self.reset_button = _button("重置场景", self.reset_scene)
@@ -494,8 +540,10 @@ class WorkbenchWindow(QMainWindow):
         <li>在控制台 Gazebo 视图观察机械臂、夹爪与场地；RViz 默认不启动，可按需切换轻量模式。停止本轮后可以重置场景。</li>
         <li>在「我的程序」创建示例副本、修改、运行，再手动发令。</li></ol>
         <h3>三种模式有什么区别？</h3>
-        <p><b>基础练习：</b>Gazebo 主视图 + MoveIt 规划与基础组判分流程；可选轻量假硬件/RViz。
-        当前工件由规划场景镜像跟随，抓取/判分并非 Gazebo 接触物理真值，不代表真实摩擦夹持。</p>
+        <p><b>基础练习：</b>二维码给出六个固定工位的顺序（例如 432165），不再依赖六个物体的类别识别。
+        编号固定为 1 长方体、2 正方体、3 圆柱体、4 球体、5 三棱柱、6 六棱柱。
+        在本页「基础组固定姿态调参」区域调整关节角并记录姿态；全部记录完成后官方基础模型自动复用。
+        Gazebo 姿态是仿真参考，真机 JAKA Mini 2 必须重新校准。</p>
         <p><b>基础组识别：</b>启动专用 Gazebo 几何体场景、移动腕部相机到识别位姿，并运行现有深度轮廓分类器；标注画面与识别清单显示在工作台相机栏，不弹出单独识别窗口。该识别演示不替代正式比赛判分。</p>
         <p><b>视觉练习：</b>复用现有 Gazebo 腕部相机 / YOLO 练习。
         启动后原程序会自动识别并抓取，不使用控制台的出题/发令按钮，不产出基础组正式成绩。
@@ -837,7 +885,8 @@ class WorkbenchWindow(QMainWindow):
             self._auto_start_reference = True
             self._reference_wait_at = time.monotonic()
             self._program_inflight = True
-            self.manager.launch("program", self._bridge("reference", "--velocity", str(self.velocity_spin.value())),
+            self.manager.launch("program", self._bridge("reference", "--velocity", str(self.velocity_spin.value()),
+                                                           "--fixed-poses", str(self._pose_path())),
                                 self.root, self._env())
             self._log("等待参考程序连接 MoveIt 并收到题目，随后自动发令。")
         except Exception as exc:
@@ -900,6 +949,7 @@ class WorkbenchWindow(QMainWindow):
             self.ready = bool(payload.get("ready")) and self.manager.alive("stack") and not self._closing_stack
             self.run_state = payload.get("run_state", "idle")
             self.scene = payload.get("scene") or {}
+            self.joint_positions = payload.get("joint_positions") or self.joint_positions
             new_score = payload.get("score")
             if new_score and new_score != self.score:
                 self._log(f"本轮结束，完成 {new_score.get('collected_count', 0)}/6；成绩仅用于学习反馈。")
@@ -913,6 +963,9 @@ class WorkbenchWindow(QMainWindow):
             self._service_success = bool(payload.get("success"))
             self._service_payload = payload
             self._log(f"{payload.get('name')}：{payload.get('message', '')}")
+        elif kind == "pose-move" and name == "pose":
+            self.pose_status.setText("姿态移动完成。" if payload.get("success") else
+                                     f"姿态移动失败：{payload.get('detail', '')}")
         elif kind == "program-ready" and name == "program" and self._auto_start_reference:
             self._auto_start_reference = False
             if self.ready and self.run_state == "armed":
@@ -983,6 +1036,9 @@ class WorkbenchWindow(QMainWindow):
                     self.manager.stop("service")
                     self._auto_start_reference = False
                     self._service_queue = []
+                elif name == "pose":
+                    if event.get("returncode") not in (0, 130):
+                        self.pose_status.setText("姿态移动进程异常退出。")
                 elif name == "program":
                     self._program_inflight = False
                     self._auto_start_reference = False
@@ -1064,8 +1120,11 @@ class WorkbenchWindow(QMainWindow):
             self.round_label.setText("视觉练习 · 原程序自动执行")
         elif self.mode == "recognition" and stack:
             self.round_label.setText("基础组几何体识别")
-        self.scene_label.setText(f"题目：seed={self.scene.get('seed')} · {self.scene.get('object_count', 0)} 件"
-                                 if self.scene else "题目：尚未生成")
+        if self.scene:
+            order = self.scene.get("qr_payload") or ("".join(map(str, self.scene.get("qr_order", []))))
+            self.scene_label.setText(f"题目：seed={self.scene.get('seed')} · 二维码抓取顺序 {order or '待扫描'} · {self.scene.get('object_count', 0)} 件")
+        else:
+            self.scene_label.setText("题目：尚未生成")
         if self.score:
             self.score_label.setText(f"完成：{self.score.get('collected_count', 0)}/6    "
                                      f"用时：{self.score.get('elapsed_s', '—')} s    分数：{self.score.get('total', '—')}")
@@ -1103,6 +1162,84 @@ class WorkbenchWindow(QMainWindow):
                 self._log(f"[DEMO] 无法保存示例记录：{exc}")
             self._refresh_results()
         self._update_buttons()
+
+    def _pose_phase_changed(self):
+        self._load_saved_pose_into_editor()
+
+    def _pose_path(self) -> Path:
+        return self.root / "jaka_competition_kit" / "config" / "track1_fixed_poses.yaml"
+
+    def _pose_key(self):
+        kind, phase = str(self.pose_phase.currentData()).split(":", 1)
+        return kind, phase
+
+    def _load_saved_pose_into_editor(self):
+        try:
+            data = yaml.safe_load(self._pose_path().read_text(encoding="utf-8")) or {}
+            kind, phase = self._pose_key()
+            target = (data.get("objects", {}).get(str(self.pose_station.value()), {})
+                      if kind == "object" else data.get("place", {}))
+            values = target.get(f"{phase}_joints") if isinstance(target, dict) else None
+            if isinstance(values, list) and len(values) == 6:
+                for spin, value in zip(self.joint_spins, values):
+                    spin.blockSignals(True); spin.setValue(float(value)); spin.blockSignals(False)
+                self.pose_status.setText("已载入已保存姿态。")
+        except (OSError, ValueError, yaml.YAMLError):
+            pass
+
+    def _read_current_joints(self):
+        values = [self.joint_positions.get(f"joint_{i}") for i in range(1, 7)]
+        if any(v is None for v in values):
+            self.pose_status.setText("尚未收到 6 个关节角，请先启动环境。")
+            return
+        for spin, value in zip(self.joint_spins, values):
+            spin.setValue(float(value))
+        self.pose_status.setText("已读取当前机械臂姿态。")
+
+    def _move_to_pose(self):
+        values = [spin.value() for spin in self.joint_spins]
+        if self.demo:
+            self.pose_status.setText("演示模式不移动真实/仿真机械臂。")
+            return
+        if not self._has_stack() or not self.ready:
+            self.pose_status.setText("请先启动并等待环境就绪。")
+            return
+        try:
+            self.manager.launch("pose", self._bridge("move-joints", "--joints", *[str(v) for v in values],
+                                                     "--velocity", str(self.velocity_spin.value())),
+                                self.root, self._env())
+            self.pose_status.setText("正在移动到输入姿态……")
+        except Exception as exc:
+            self.pose_status.setText(f"移动失败：{exc}")
+
+    def _record_pose(self):
+        values = [spin.value() for spin in self.joint_spins]
+        path = self._pose_path()
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
+            data = data or {"version": 1, "enabled": False, "objects": {}, "place": {}}
+            kind, phase = self._pose_key()
+            target = data.setdefault("objects", {}).setdefault(str(self.pose_station.value()), {}) \
+                     if kind == "object" else data.setdefault("place", {})
+            target[f"{phase}_joints"] = [float(v) for v in values]
+            complete = True
+            for station in range(1, 7):
+                obj = data.get("objects", {}).get(str(station), {})
+                complete = complete and all(isinstance(obj.get(f"{p}_joints"), list) and len(obj[f"{p}_joints"]) == 6
+                                            for p in ("approach", "grasp", "lift"))
+            place = data.get("place", {})
+            complete = complete and all(isinstance(place.get(f"{p}_joints"), list) and len(place[f"{p}_joints"]) == 6
+                                        for p in ("approach", "release", "retreat"))
+            data["enabled"] = bool(complete)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            tmp.replace(path)
+            self.pose_status.setText("已记录；" + ("官方基础模型将使用固定姿态。" if complete else "请继续记录其它阶段。"))
+            self._log(f"已记录固定姿态：{kind} {phase} -> {path}")
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            self.pose_status.setText(f"保存失败：{exc}")
+
 
     def choose_program(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择可信的本地 Python 程序",

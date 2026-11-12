@@ -1,0 +1,8 @@
+# 赛道一固定关节姿态。单位：弧度。
+# enabled 会在工作台记录完 1..6 的 approach/grasp/lift 以及料盒
+# approach/release/retreat 后自动变为 true；未完成前官方模型继续使用安全的
+# 笛卡尔基础流程。仿真记录值不能直接视为真机标定值，真机必须重新校准。
+version: 1
+enabled: false
+objects: {}
+place: {}

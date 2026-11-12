@@ -34,7 +34,7 @@ from std_srvs.srv import Trigger
 
 from .arena import OBJECT_LIFT, Arena, load_arena, radius
 from .qr import make_order, parse, payload, render_png
-from .scene import SceneClient, bin_container, box_object, cylinder_object
+from .scene import SceneClient, bin_container, box_object, cylinder_object, sphere_object
 
 class SceneGenerator(rclpy.node.Node):
     def __init__(self):
@@ -217,7 +217,13 @@ class SceneGenerator(rclpy.node.Node):
             if shape == "cylinder":
                 objs.append(cylinder_object(obj_id, self.arena.frame_id,
                     (x, y, z_bottom + sz / 2.0), max(sx, sy) / 2.0, sz))
+            elif shape == "sphere":
+                # dims[0] 是球体直径；球的最低点仍放在工位板上。
+                objs.append(sphere_object(obj_id, self.arena.frame_id,
+                    (x, y, z_bottom + sz / 2.0), max(sx, sy, sz) / 2.0))
             else:
+                # MoveIt 的 SolidPrimitive 没有棱柱类型。三棱柱/六棱柱在
+                # 规划层使用包络盒，manifest 保留真实 shape 供 Gazebo/教程显示。
                 objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
                                        dims, z_bottom=z_bottom))
             top = z_bottom + sz

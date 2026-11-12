@@ -9,9 +9,12 @@ import argparse
 
 def parse_order(text):
     value = text.strip()
-    if not value.upper().startswith("JAKA1-"):
-        raise ValueError("前缀应为 JAKA1-")
-    digits = value[6:]
+    if value.upper().startswith("JAKA1-"):
+        digits = value[6:]
+    elif len(value) == 6 and value.isdigit():
+        digits = value
+    else:
+        raise ValueError("应为 JAKA1- 加 6 位数字，或直接 6 位数字")
     if len(digits) != 6 or sorted(digits) != list("123456"):
         raise ValueError("顺序必须恰好是 1～6 各一次，例如 JAKA1-246135")
     return [int(digit) for digit in digits]

@@ -30,7 +30,14 @@ from .arena import Arena, Box
 from .backend import MoveGroupBackend
 from .gripper import Gripper
 from .backend import MoveResult
-from .scene import SceneClient, box_object, cylinder_object
+from .scene import SceneClient, box_object, cylinder_object, sphere_object
+
+
+def object_height_for(obj: Dict) -> float:
+    if "size" in obj:
+        return float(obj["size"])
+    dims = obj.get("dims", [])
+    return float(dims[2]) if len(dims) == 3 else 0.05
 
 
 class Executor:
@@ -248,6 +255,9 @@ class Executor:
             h = float(dims[2]) if dims is not None else size
             rad = float(dims[0]) / 2.0 if dims is not None else size / 2.0
             prim = cylinder_object(object_id, self.arena.tcp_link, (0, 0, 0), rad, h)
+        elif shape == "sphere":
+            d = tuple(dims) if dims is not None else (size, size, size)
+            prim = sphere_object(object_id, self.arena.tcp_link, (0, 0, 0), max(d) / 2.0)
         else:
             d = tuple(dims) if dims is not None else (size, size, size)
             prim = box_object(object_id, self.arena.tcp_link, (0, 0, 0), d)
@@ -322,6 +332,54 @@ class Executor:
             self.node.get_logger().warn(f"复位到 home 也失败了: {res}")
 
     # ---------- 组合动作 ----------
+    def fixed_pick_and_place(self, obj: Dict, bin_box: Box, poses: Dict) -> bool:
+        """按工作台记录的固定关节姿态完成一次抓取。
+
+        ``poses`` 已由 fixed_poses 模块校验；这里故意不从场景读取二维码顺序，
+        只消费当前循环传入的 station 对象。固定姿态缺失时返回 False，由参考
+        程序回退到原有的安全笛卡尔基础流程。
+        """
+        station = int(obj.get("station", 0))
+        def get(phase, place=False):
+            target = poses.get("place", {}) if place else \
+                     poses.get("objects", {}).get(str(station), {})
+            return target.get(f"{phase}_joints", target.get(phase))
+        phases = [get("approach"), get("grasp"), get("lift"),
+                  get("approach", True), get("release", True), get("retreat", True)]
+        if any(v is None for v in phases):
+            return False
+        self.last_failure = ""
+        def move(joints):
+            result = self.backend.goto_joints(joints)
+            if result.ok:
+                try:
+                    self.tcp_xyz = tuple(float(v) for v in self.tcp_pose()[0])
+                except Exception:  # TF may lag a single cycle; grasp() retries no motion.
+                    pass
+            return result
+        if not move(phases[0]).ok:
+            self.last_failure = "motion"; return False
+        if not move(phases[1]).ok:
+            self.last_failure = "motion"; return False
+        x, y = obj["xy"]
+        if not self.grasp(obj["id"], object_height_for(obj),
+                          (x, y, obj["z"]), dims=obj.get("dims"),
+                          shape=obj.get("shape", "box"),
+                          grasp_width=obj.get("grasp_width")):
+            self.last_failure = "motion"; return False
+        if not move(phases[2]).ok:
+            self.last_failure = "motion"; return False
+        if not move(phases[3]).ok:
+            self.last_failure = "motion"; return False
+        if not move(phases[4]).ok:
+            self.last_failure = "motion"; return False
+        if not self.release(obj["id"], bin_box):
+            self.last_failure = "motion"; return False
+        if not move(phases[5]).ok:
+            self.last_failure = "motion"; return False
+        return True
+
+
     def pick_and_place(self, object_id: str, x: float, y: float,
                        grasp_tcp_z: float, object_center_z: float, size: float,
                        bin_box: Box, release_z: float,

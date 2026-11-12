@@ -22,6 +22,7 @@ from std_msgs.msg import String
 from .arena import load_arena
 from .backend import MoveGroupBackend
 from .executor import Executor
+from .fixed_poses import default_fixed_pose_path, is_complete, load_fixed_poses
 from .gripper import make_gripper
 from .scene import SceneClient
 
@@ -56,8 +57,15 @@ class ReferenceBase(rclpy.node.Node):
         self.declare_parameter("io_close_index", 1)   # 工具端 DO_2
         self.declare_parameter("io_settle", 0.5)
         self.declare_parameter("debug_timing", False)
+        self.declare_parameter("fixed_poses_config", default_fixed_pose_path())
 
         self.arena = load_arena(str(self.get_parameter("arena_config").value) or None)
+        pose_path = str(self.get_parameter("fixed_poses_config").value) or default_fixed_pose_path()
+        try:
+            self.fixed_poses = load_fixed_poses(pose_path)
+        except (OSError, ValueError) as exc:
+            self.get_logger().warning(f"固定姿态配置不可用，将使用基础笛卡尔流程：{exc}")
+            self.fixed_poses = {}
         self.scene: Dict = {}
         self.run_state = "idle"
 
@@ -157,21 +165,31 @@ class ReferenceBase(rclpy.node.Node):
             self.get_logger().info(
                 f"[{k}/{total}] {tag}{obj.get('label','')} "
                 f"x={x*1000:.0f} y={y*1000:.0f} r={r*1000:.0f}mm")
-            if verify_only:
-                res = self.backend.validate_pose((x, y, obj["grasp_tcp_z"]),
-                                                 self.arena.tool_down_quat)
-                self.get_logger().info(f"    规划自检: {res}")
-                ok += int(res.ok)
+            use_fixed = (self.scene.get("track") == 1 and is_complete(self.fixed_poses)
+                         and bool(obj.get("station")))
+            if use_fixed and verify_only:
+                phases = [self.fixed_poses["objects"][str(obj["station"])][p]
+                          for p in ("approach_joints", "grasp_joints", "lift_joints")]
+                phases += [self.fixed_poses["place"][p] for p in
+                           ("approach_joints", "release_joints", "retreat_joints")]
+                results = [self.backend.goto_joints(j, plan_only=True) for j in phases]
+                ok += int(all(r.ok for r in results))
+                self.get_logger().info(f"    固定姿态规划自检: {sum(r.ok for r in results)}/{len(results)}")
                 continue
 
             # 赛道二允许单件重试 2 次(见 competition.md), 赛道一同样受益。
             good = False
             for attempt in range(3):
-                good = self.arm.pick_and_place(
-                    obj["id"], x, y, obj["grasp_tcp_z"], obj["z"], object_height(obj),
-                    bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"],
-                    dims=obj.get("dims"), shape=obj.get("shape", "box"),
-                    grasp_width=obj.get("grasp_width"))
+                if use_fixed:
+                    good = self.arm.fixed_pick_and_place(obj, bin_box, self.fixed_poses)
+                    if good:
+                        self.get_logger().info("    使用已记录固定关节姿态")
+                else:
+                    good = self.arm.pick_and_place(
+                        obj["id"], x, y, obj["grasp_tcp_z"], obj["z"], object_height(obj),
+                        bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"],
+                        dims=obj.get("dims"), shape=obj.get("shape", "box"),
+                        grasp_width=obj.get("grasp_width"))
                 if good:
                     break
                 if self.arm.last_failure == "unreachable":

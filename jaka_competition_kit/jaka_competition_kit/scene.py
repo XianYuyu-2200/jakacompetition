@@ -40,6 +40,23 @@ def box_object(obj_id: str, frame_id: str, center: Sequence[float],
     return obj
 
 
+def sphere_object(obj_id: str, frame_id: str, center: Sequence[float],
+                  radius: float, operation: int = CollisionObject.ADD) -> CollisionObject:
+    prim = SolidPrimitive()
+    prim.type = SolidPrimitive.SPHERE
+    prim.dimensions = [float(radius)]
+    pose = Pose()
+    pose.position.x, pose.position.y, pose.position.z = (float(v) for v in center)
+    pose.orientation.w = 1.0
+    obj = CollisionObject()
+    obj.header.frame_id = frame_id
+    obj.id = obj_id
+    obj.primitives.append(prim)
+    obj.primitive_poses.append(pose)
+    obj.operation = operation
+    return obj
+
+
 def cylinder_object(obj_id: str, frame_id: str, center: Sequence[float],
                     radius: float, height: float,
                     operation: int = CollisionObject.ADD) -> CollisionObject:
