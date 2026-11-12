@@ -94,6 +94,7 @@ class Track1Recognizer(Node):
         self.max_area = int(self.get_parameter("max_area").value)
         self.bridge = CvBridge()
         self.color = None
+        self.color_msg = None
         self.depth = None
         self.info = None
         self.color_at = 0.0
@@ -101,6 +102,7 @@ class Track1Recognizer(Node):
         self.last_save = 0.0
         self.best = None
         self.pub = self.create_publisher(String, "/track1/detections", 10)
+        self.image_pub = self.create_publisher(Image, "/track1/annotated_image", 1)
         self.create_subscription(
             Image, "/gemini305/color/image_raw", self._on_color, qos_profile_sensor_data)
         self.create_subscription(
@@ -121,6 +123,7 @@ class Track1Recognizer(Node):
         return "/tmp/track1_recognize"
 
     def _on_color(self, msg):
+        self.color_msg = msg
         self.color = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         self.color_at = time.monotonic()
 
@@ -230,6 +233,7 @@ class Track1Recognizer(Node):
         msg = String()
         msg.data = json.dumps(payload, ensure_ascii=False)
         self.pub.publish(msg)
+        self._publish_annotated(found, complete, located)
         now = time.monotonic()
         better = self.best is None or located > self.best[0] or (
             located == self.best[0] and complete and not self.best[1])
@@ -240,6 +244,22 @@ class Track1Recognizer(Node):
             names = " ".join(f"{it['name']}{'✓' if it['ok'] else '?'}" for it in found)
             self.get_logger().info(
                 f"看到 {len(found)} 个，位置对上 {located}/6。{names}")
+
+    def _publish_annotated(self, found, complete, located):
+        items = []
+        for it in found:
+            x, y, w, h = it["bbox"]
+            label = f"{it['name']} ✓" if it.get("ok") else it["name"]
+            items.append((x, y, w, h, label, bool(it.get("ok"))))
+        canvas = _draw_labels(self.color, items)
+        tag = f"{len(found)}/6 objects · {located}/6 located"
+        cv2.rectangle(canvas, (0, 0), (canvas.shape[1], 32), (20, 25, 32), -1)
+        cv2.putText(canvas, tag, (10, 23), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.62, (255, 255, 255), 1, cv2.LINE_AA)
+        image_msg = self.bridge.cv2_to_imgmsg(canvas, encoding="bgr8")
+        if self.color_msg is not None:
+            image_msg.header = self.color_msg.header
+        self.image_pub.publish(image_msg)
 
     def _save(self, found, complete, located):
         os.makedirs(self.output_dir, exist_ok=True)

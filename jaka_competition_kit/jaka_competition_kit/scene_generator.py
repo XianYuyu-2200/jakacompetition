@@ -202,20 +202,34 @@ class SceneGenerator(rclpy.node.Node):
         for i, (x, y) in enumerate(
                 [self.arena.station_xy(k) for k in range(1, 7)], start=1):
             lib_item = lib[i - 1]
-            size = float(lib_item["size"])
+            # 每件按规则目录里的实际外形生成。旧版把六类都硬编码成 size³
+            # 方块，导致题面名称与 Gazebo/MoveIt 几何不一致。
+            legacy_size = float(lib_item.get("size", 0.050))
+            dims = tuple(float(v) for v in lib_item.get(
+                "dims", (legacy_size, legacy_size, legacy_size)))
+            if len(dims) != 3 or min(dims) <= 0:
+                raise ValueError(f"工件 {lib_item.get('id', i)} dims 必须是三个正数")
+            shape = str(lib_item.get("shape", "box"))
+            sx, sy, sz = dims
             obj_id = f"wp_{i}"
             # 工件坐在工位标记板上, 底面 z = 板厚 + OBJECT_LIFT(避免贴面误判)
             z_bottom = self.station_top + OBJECT_LIFT
-            objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
-                                   (size, size, size), z_bottom=z_bottom))
-            top = z_bottom + size
+            if shape == "cylinder":
+                objs.append(cylinder_object(obj_id, self.arena.frame_id,
+                    (x, y, z_bottom + sz / 2.0), max(sx, sy) / 2.0, sz))
+            else:
+                objs.append(box_object(obj_id, self.arena.frame_id, (x, y, 0.0),
+                                       dims, z_bottom=z_bottom))
+            top = z_bottom + sz
+            tcp_z = self.arena.grasp_tcp_z(top, sz)
             manifest.append({
                 "id": obj_id, "station": i, "label": lib_item["name"],
-                "xy": [x, y], "size": size, "z": z_bottom + size / 2.0,
-                "top_z": top, "shape": "box",
-                "grasp_tcp_z": self.arena.grasp_tcp_z(top, size),
-                "approach_z": self.arena.approach_z(self.arena.grasp_tcp_z(top, size)),
-                "release_tcp_z": self.arena.release_tcp_z(size),
+                "xy": [x, y], "size": sz, "dims": list(dims),
+                "grasp_width": min(sx, sy), "z": z_bottom + sz / 2.0,
+                "top_z": top, "shape": shape,
+                "grasp_tcp_z": tcp_z,
+                "approach_z": self.arena.approach_z(tcp_z),
+                "release_tcp_z": self.arena.release_tcp_z(sz),
             })
         self.scene.apply(objs)
         return {"track": 1, "seed": seed, "qr_payload": text, "qr_order": order,

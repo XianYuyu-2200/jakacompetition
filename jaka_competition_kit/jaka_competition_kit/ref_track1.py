@@ -10,7 +10,7 @@
 参数:
   vel_scale   运动速度缩放(0.3 保守 / 1.0 全速)
   verify_only 只规划不执行(赛前场地自检)
-  gripper     mock(仿真) / jaka_io(真机)
+  gripper     sim(仿真) / jaka_io(真机工具端 NPN, DO_1 张 DO_2 合) / wheeltec / mock
 """
 from __future__ import annotations
 

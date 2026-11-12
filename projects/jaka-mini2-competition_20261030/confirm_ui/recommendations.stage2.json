@@ -1,0 +1,166 @@
+{
+  "stage": "stage2",
+  "lang": "zh",
+  "recommend": {
+    "delivery_purpose": "balanced",
+    "mode": "custom",
+    "visual_style": "custom",
+    "image_strategy": "custom",
+    "image_usage": [
+      "provided"
+    ],
+    "generation_mode": "continuous"
+  },
+  "page_count": {
+    "value": "12"
+  },
+  "image_notes": {
+    "value": "只用仓库里已经画好的赛场图：design/fig_arena_track1.png、fig_arena_track2.png、arena_layout.png、fig_workspace.png、reach_envelope.png、fig_flow.png。它们是几何和流程的证据，不裁掉标注。不生成 AI 图，不从网上搜图，也不用官方手册截图代替赛场真源。"
+  },
+  "proactive_speaker_notes": {
+    "value": true
+  },
+  "proactive_custom_animations": {
+    "value": false
+  },
+  "proactive_narration_audio": {
+    "value": false
+  },
+  "refine_spec": {
+    "value": false
+  },
+  "design_spec_depth": {
+    "value": "brief"
+  },
+  "design_directions": {
+    "selected": 1,
+    "candidates": [
+      {
+        "id": "track-walkthrough",
+        "name": "按步骤听懂",
+        "note": "14 页。把赛场、两条赛道、计分和仓库验证拆成可跟着走的教学步骤。适合第一次听规则的队员；会后翻阅要靠讲者备注补全。",
+        "mode": "custom",
+        "mode_behavior": "以 instructional 为唯一目录基底。先给共同前提，再按先决条件往后讲：作业带、真源、赛道一、赛道二、限时口径、已验证范围。两条赛道用同一套步骤对照，标题写这一页在教什么。",
+        "visual_style": "custom",
+        "visual_style_behavior": "以 soft-rounded 为唯一目录基底。步骤放在同一套圆角容器和编号圆点上，封面用一块出界的色块托住标题，卡片之间留均匀间距。阴影只用于当前步骤，同类卡片保持平面。",
+        "icons": "tabler-filled",
+        "color": {
+          "name": "课堂绿",
+          "palette": {
+            "background": "#F6F3EC",
+            "secondary_bg": "#E5F0E8",
+            "primary": "#1F4D3A",
+            "accent": "#E07A3D",
+            "secondary_accent": "#3D8B7A",
+            "body_text": "#1C2421"
+          }
+        },
+        "typography": {
+          "name": "微软雅黑一致",
+          "heading": {
+            "primary": "Microsoft YaHei",
+            "english": "Arial",
+            "css": "sans-serif"
+          },
+          "body": {
+            "primary": "Microsoft YaHei",
+            "english": "Arial",
+            "css": "sans-serif"
+          },
+          "body_size": 24
+        },
+        "image_strategy": {
+          "name": "扁平示意",
+          "rendering": "custom",
+          "visual": "大色块衬托现成场地图，图本身不重绘",
+          "mood": "清楚、好跟着走",
+          "behavior": "由 flat 负责页面上的色块和圆角衬底：无描边、无材质、靠重叠色块分层次。赛场图保持原文件，不改成插画。"
+        }
+      },
+      {
+        "id": "evidence-brief",
+        "name": "结论前置简报",
+        "note": "12 页，推荐。开场先落下三条不能记错的结论，后面每页是可检索的证据。兼顾 10 到 15 分钟讲解和会后自己翻。",
+        "mode": "custom",
+        "mode_behavior": "pyramid 负责开场和每个判断页：标题写成结论，先给答案再给证据。briefing 负责后半的查阅页：赛道参数、限时表、验证状态用题名并列，不另起论点。事实只来自赛题和 README。",
+        "visual_style": "custom",
+        "visual_style_behavior": "以 data-journalism 为唯一目录基底。页面绕数字和对照表展开，用通栏基线、侧栏和来源行，而不是一张张卡片。红色只标不能跨线复用的风险数字，其余序列用同一色族的深浅。",
+        "icons": "phosphor-duotone",
+        "color": {
+          "name": "报章墨色",
+          "palette": {
+            "background": "#F4F1EA",
+            "secondary_bg": "#E6E2D6",
+            "primary": "#1A1A1A",
+            "accent": "#C4372A",
+            "secondary_accent": "#2F5D8C",
+            "body_text": "#242424"
+          }
+        },
+        "typography": {
+          "name": "宋体标题 × 雅黑正文",
+          "heading": {
+            "primary": "SimSun",
+            "english": "Georgia",
+            "css": "serif"
+          },
+          "body": {
+            "primary": "Microsoft YaHei",
+            "english": "Arial",
+            "css": "sans-serif"
+          },
+          "body_size": 22
+        },
+        "image_strategy": {
+          "name": "证据配图",
+          "rendering": "custom",
+          "visual": "场地图作为证据，旁边是来源和读图结论",
+          "mood": "克制、可核对",
+          "behavior": "由 editorial 负责配图区的细线和留白：平面、无阴影，一条强调线指向该看的标注。不重绘赛场，不给照片加半调。"
+        }
+      },
+      {
+        "id": "field-blueprint",
+        "name": "赛场蓝图核对",
+        "note": "10 页。把几何真源、可达范围和两条赛道的料盒画成可标注的图纸，适合真机部署时对着看。口头讲解会比简报更密，备注只补操作口径。",
+        "mode": "custom",
+        "mode_behavior": "以 briefing 为唯一目录基底。每页是一张可核对的题目：作业带、真源、赛道一、赛道二、限时、验证状态。不先抛判断句，标题保持题目，权重均匀，方便会后按项查找。",
+        "visual_style": "custom",
+        "visual_style_behavior": "以 blueprint 为唯一目录基底。深色图纸底上用同一套线色画尺寸线、引线和角标，当前要核对的一项只用一个高对比色点出。布局跟着示意图走，不把内容再装进卡片。",
+        "icons": "tabler-outline",
+        "color": {
+          "name": "深蓝图纸",
+          "palette": {
+            "background": "#0E1C2F",
+            "secondary_bg": "#16324F",
+            "primary": "#E7F1FF",
+            "accent": "#F5C542",
+            "secondary_accent": "#7EB6FF",
+            "body_text": "#D6E4F5"
+          }
+        },
+        "typography": {
+          "name": "雅黑 + 等宽拉丁",
+          "heading": {
+            "primary": "Microsoft YaHei",
+            "english": "Consolas",
+            "css": "sans-serif"
+          },
+          "body": {
+            "primary": "Microsoft YaHei",
+            "english": "Consolas",
+            "css": "sans-serif"
+          },
+          "body_size": 24
+        },
+        "image_strategy": {
+          "name": "图纸底图",
+          "rendering": "custom",
+          "visual": "现成场地图铺在网格底上，尺寸和引线另用矢量标注",
+          "mood": "精确、可对照",
+          "behavior": "由 blueprint 负责底图周围的网格、直角引线和单色线框。线宽统一，没有材质和阴影。场地图本身不改画，标注留在原生文字里。"
+        }
+      }
+    ]
+  }
+}

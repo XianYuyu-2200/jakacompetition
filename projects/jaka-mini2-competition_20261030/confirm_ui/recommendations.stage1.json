@@ -1,0 +1,36 @@
+{
+  "stage": "stage1",
+  "lang": "zh",
+  "primary_language": "zh-CN",
+  "recommend": {
+    "canvas": "ppt169"
+  },
+  "audience": {
+    "value": "参赛队员、指导老师和现场评审。他们熟悉机器人或 ROS，但需要把赛题规则、仿真判分和当前仓库验证状态一次对齐。"
+  },
+  "communication_intent": {
+    "value": "说明 JAKA Mini 2 机器人应用挑战赛怎么比、分数怎么来、仿真和真机哪一份几何是真源，并交代本仓库参考实现已经验证到哪一步。"
+  },
+  "audience_outcome": {
+    "value": "听完能讲清两条赛道的任务、限时和满分，知道判分只看 MoveIt 规划场景，以及换线或换夹爪后必须重标定限时。"
+  },
+  "core_message": {
+    "value": "初赛和决赛共用同一份 arena.yaml 与同一套评分程序；限时来自参考实现中位数乘 1.4，不能把假硬件成绩直接拿到 Gazebo 或真机上用。"
+  },
+  "delivery_context": {
+    "value": "主要为有人讲解的 10 到 15 分钟内部对齐或赛前说明；次要为会后自己翻阅的规则备忘。"
+  },
+  "artifact_afterlife": {
+    "value": "作为赛前说明、队内交接和后续真机部署时核对赛场几何与计时口径的材料。"
+  },
+  "content_divergence": {
+    "value": ""
+  },
+  "template_options": {
+    "schema_version": 1,
+    "phase": "template",
+    "lang": "zh",
+    "explicit_workspace_roots": [],
+    "default_mode": "free_design"
+  }
+}

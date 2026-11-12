@@ -46,6 +46,7 @@ setup(
             "gz_scene = jaka_competition_kit.gz_scene:main",
             "gemini305_preview = jaka_competition_kit.gemini305_preview:main",
             "track1_recognize = jaka_competition_kit.track1_recognize:main",
+            "gripper_io = jaka_competition_kit.gripper_io:main",
         ],
     },
 )

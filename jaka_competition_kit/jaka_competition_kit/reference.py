@@ -26,6 +26,21 @@ from .gripper import make_gripper
 from .scene import SceneClient
 
 
+def object_height(obj: Dict) -> float:
+    """Return the workpiece height, accepting both current and legacy manifests.
+
+    ``size`` is the historical height field. Newer scene descriptions also carry
+    ``dims``; use its Z dimension when consuming a manifest that omitted ``size``.
+    """
+    if "size" in obj:
+        return float(obj["size"])
+    dims = obj.get("dims")
+    if isinstance(dims, (list, tuple)) and len(dims) == 3:
+        return float(dims[2])
+    raise ValueError(
+        f"工件 {obj.get('id', '<unknown>')} 缺少 size，且 dims 不是三维尺寸")
+
+
 class ReferenceBase(rclpy.node.Node):
     """等题 -> 等发令 -> 按顺序抓取投放 -> 汇总。"""
 
@@ -35,8 +50,11 @@ class ReferenceBase(rclpy.node.Node):
         self.declare_parameter("vel_scale", 0.5)
         self.declare_parameter("verify_only", False)
         # 默认 sim: 仿真的 fingers 会张开/闭合(走 /gripper_controller/commands);
-        # 真机用 wheeltec(串口) / jaka_io(工具端 IO) / mock(不驱动)
+        # 真机用 wheeltec(串口) / jaka_io(工具端 NPN: DO_1 张, DO_2 合) / mock
         self.declare_parameter("gripper", "sim")
+        self.declare_parameter("io_open_index", 0)    # 工具端 DO_1
+        self.declare_parameter("io_close_index", 1)   # 工具端 DO_2
+        self.declare_parameter("io_settle", 0.5)
         self.declare_parameter("debug_timing", False)
 
         self.arena = load_arena(str(self.get_parameter("arena_config").value) or None)
@@ -54,8 +72,16 @@ class ReferenceBase(rclpy.node.Node):
             vel_scale=vel, acc_scale=vel,
             planning_attempts=2, allowed_planning_time=2.0)
         self.scene_cli = SceneClient()
-        self.gripper = make_gripper(self.get_parameter("gripper").value, self,
-                                    arena=self.arena)
+        gripper_mode = str(self.get_parameter("gripper").value)
+        gripper_kwargs = {}
+        if gripper_mode.lower() in ("jaka_io",):
+            gripper_kwargs = {
+                "open_index": int(self.get_parameter("io_open_index").value),
+                "close_index": int(self.get_parameter("io_close_index").value),
+                "settle": float(self.get_parameter("io_settle").value),
+            }
+        self.gripper = make_gripper(gripper_mode, self, arena=self.arena,
+                                    **gripper_kwargs)
         self.arm = Executor(self, self.arena, self.backend, self.scene_cli, self.gripper,
                             timing_log=bool(self.get_parameter("debug_timing").value))
         self.done = False
@@ -72,22 +98,23 @@ class ReferenceBase(rclpy.node.Node):
         self.get_logger().info(f"比赛状态 -> {self.run_state}")
 
     # ---------- 等待 ----------
-    def wait_for_state(self, target: str, timeout: float = 180.0) -> bool:
-        """等裁判发令(state 变 running)后才动作, 保证计时公平。"""
-        t0 = time.time()
-        while time.time() - t0 < timeout:
-            rclpy.spin_once(self, timeout_sec=0.1)
+    def wait_for_state(self, target: str, timeout: Optional[float] = None) -> bool:
+        """等裁判发令; 默认不限时, 可指定 timeout 用于自检。"""
+        t0 = time.monotonic()
+        while rclpy.ok() and (timeout is None or time.monotonic() - t0 < timeout):
             if self.run_state == target:
                 return True
-        return False
-
-    def wait_for_scene(self, timeout: float = 60.0) -> bool:
-        t0 = time.time()
-        while time.time() - t0 < timeout:
             rclpy.spin_once(self, timeout_sec=0.1)
+        return self.run_state == target
+
+    def wait_for_scene(self, timeout: Optional[float] = None) -> bool:
+        """等裁判出题; 默认不限时, 避免场景尚未准备好时参考程序退出。"""
+        t0 = time.monotonic()
+        while rclpy.ok() and (timeout is None or time.monotonic() - t0 < timeout):
             if self.scene:
                 return True
-        return False
+            rclpy.spin_once(self, timeout_sec=0.1)
+        return bool(self.scene)
 
     # ---------- 子类实现 ----------
     def plan_order(self) -> List[Dict]:
@@ -96,6 +123,7 @@ class ReferenceBase(rclpy.node.Node):
 
     # ---------- 主循环 ----------
     def run(self):
+        self.get_logger().info("等待裁判出题 (/competition/generate) ...")
         if not self.wait_for_scene():
             self.get_logger().error("没有收到题目: 先调 /competition/generate")
             return
@@ -107,7 +135,7 @@ class ReferenceBase(rclpy.node.Node):
         else:
             self.get_logger().info("题目已就绪, 等待裁判发令 (/competition/start) ...")
             if not self.wait_for_state("running"):
-                self.get_logger().error("等待发令超时, 退出")
+                self.get_logger().error("等待发令中断, 退出")
                 return
             self.get_logger().info("发令! 开始执行")
 
@@ -140,7 +168,7 @@ class ReferenceBase(rclpy.node.Node):
             good = False
             for attempt in range(3):
                 good = self.arm.pick_and_place(
-                    obj["id"], x, y, obj["grasp_tcp_z"], obj["z"], obj["size"],
+                    obj["id"], x, y, obj["grasp_tcp_z"], obj["z"], object_height(obj),
                     bin_box, obj["release_tcp_z"], approach_z=obj["approach_z"],
                     dims=obj.get("dims"), shape=obj.get("shape", "box"),
                     grasp_width=obj.get("grasp_width"))

@@ -190,7 +190,7 @@ ros2 run jaka_competition_kit ref_track1 --ros-args -p debug_timing:=true
 ## 5. 真机
 
 见 `../docs/真机部署.md`。要点:真机与仿真**只差"启动什么"**,
-`-p gripper:=jaka_io` 切夹爪,其余代码不动。
+`-p gripper:=jaka_io` 切到工具端 NPN 夹爪(DO_1 张开, DO_2 闭合),其余代码不动。
 
 ---
 ## 6. 踩过的坑(改代码前先看)

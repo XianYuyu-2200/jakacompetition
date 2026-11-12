@@ -1,0 +1,53 @@
+# Workbench owns task controls. Keep RViz focused on the actual scene/robot,
+# without the wide manual MotionPlanning panel or looping planned trajectories.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Value: true
+      Alpha: 0.25
+      Cell Size: 0.1
+      Plane Cell Count: 20
+      Color: 100; 112; 128
+    - Class: moveit_rviz_plugin/PlanningScene
+      Name: Learning Scene
+      Value: true
+      Robot Description: robot_description
+      Planning Scene Topic: /monitored_planning_scene
+      Scene Geometry:
+        Scene Alpha: 1
+        Show Scene Geometry: true
+      Scene Robot:
+        Robot Alpha: 1
+        Show Robot Visual: true
+        Show Robot Collision: false
+  Global Options:
+    Background Color: 32; 39; 51
+    Fixed Frame: world
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.45
+      Focal Point:
+        X: 0.12
+        Y: 0.20
+        Z: 0.08
+      Name: Learning View
+      Pitch: 0.90
+      Target Frame: world
+      Yaw: 0.45
+Window Geometry:
+  Width: 1500
+  Height: 1000
+  Hide Left Dock: true
+  Hide Right Dock: true

@@ -6,7 +6,7 @@
     WheeltecGripper —— 真机: WHEELTEC MS42DC 柔性爪, 走 ``step_motor`` 包的
                        串口协议(话题 ``/motor_control``), 而不是 ros2_control。
     MockGripper     —— 不驱动任何东西, 只保证流程能跑通。
-    JakaIOGripper   —— 老的真机方案: 用 jaka_driver 的工具端数字 IO 控制夹爪。
+    JakaIOGripper   —— 真机: 工具端两路 NPN。DO_1 张开, DO_2 闭合。
 
 队伍如果自备夹爪, 只要实现 ``open()`` / ``close(object_size)`` 两个方法即可接入。
 
@@ -21,8 +21,6 @@ import time
 from typing import Optional
 
 import rclpy
-from std_srvs.srv import SetBool
-
 
 class Gripper:
     name = "abstract"
@@ -67,51 +65,92 @@ class MockGripper(Gripper):
 
 
 class JakaIOGripper(Gripper):
-    """真机用:通过 jaka_driver 的工具端数字 IO 控制夹爪。
+    """真机: 工具端两路 NPN 数字输出。
 
-    参数按你的实际夹爪改:
-      io_index        工具 IO 编号(0..1)
-      open_level      张开电平(True=高电平)
-      closed_level    闭合电平
+    示教器「I/O 面板 → 固定 I/O → 工具端」,DO_1 / DO_2 的类型都选 NPN
+    (NPN/PNP 是输出电气类型, 由示教器保存; 这里只负责把开关打到和点按一样的状态):
 
-    注意:jaka_driver 与 jaka_planner **不能同时运行**。
-    本项目真机走 jaka_planner(轨迹执行),所以如果你的夹爪只认 jaka_driver 的
-    set_io 服务,需要另起一个 jaka_driver 或用机械臂厂商提供的 IO 旁路。
-    这一点在 docs/真机部署.md 里有说明。
+      DO_1 (SDK index 0) 置 1 → 张开
+      DO_2 (SDK index 1) 置 1 → 闭合
+
+    两路互斥: 先关掉另一路, 再打开这一路, 避免两个线圈同时吸合。
+    置 1 之后保持, 和示教器上把开关拨到开是同一件事。
+
+    服务优先 ``/jaka_planner/set_io`` —— 和轨迹共用 ``jaka_planner`` 已经登录的
+    那条 SDK 连接。``jaka_driver`` 不能和 planner 同时跑, 只在单独开 driver 时
+    才退回 ``/jaka_driver/set_io``。
     """
 
     name = "jaka_io"
 
-    def __init__(self, node, io_index: int = 0, open_level: bool = False,
-                 closed_level: bool = True, settle: float = 0.4):
+    def __init__(self, node, open_index: int = 0, close_index: int = 1,
+                 settle: float = 0.5, io_type: int = 1, service: str = ""):
+        from jaka_msgs.srv import SetIO
         self.node = node
-        self.io_index = io_index
-        self.open_level = open_level
-        self.closed_level = closed_level
-        self.settle = settle
-        self._cli = node.create_client(SetBool, "/jaka_driver/set_io")
-        self._available = self._cli.wait_for_service(timeout_sec=3.0)
+        self.open_index = int(open_index)
+        self.close_index = int(close_index)
+        self.settle = float(settle)
+        self.io_type = int(io_type)          # 1 = 工具端 IO_TOOL
+        self._SetIO = SetIO
+        names = [service] if service else ["/jaka_planner/set_io", "/jaka_driver/set_io"]
+        self._cli = None
+        self._service = ""
+        for name in names:
+            cli = node.create_client(SetIO, name)
+            if cli.wait_for_service(timeout_sec=1.5):
+                self._cli = cli
+                self._service = name
+                break
+            node.destroy_client(cli)
+        if self._cli is None:
+            self._service = names[0]
+            self._cli = node.create_client(SetIO, self._service)
+            node.get_logger().warn(
+                f"夹爪 IO 服务暂未就绪 ({', '.join(names)})。"
+                "先起 jaka_planner, 并确认工具端 DO_1/DO_2 为 NPN。")
+        else:
+            node.get_logger().info(
+                f"夹爪 IO: {self._service}, 工具端 NPN, "
+                f"DO_{self.open_index + 1}=张开, DO_{self.close_index + 1}=闭合")
 
-    def _set(self, level: bool) -> bool:
-        if not self._available:
+    def _set_do(self, index: int, value: float) -> bool:
+        if not self._cli.service_is_ready() and not self._cli.wait_for_service(timeout_sec=2.0):
+            self.node.get_logger().error(f"夹爪 IO 服务 {self._service} 不可用")
             return False
-        req = SetBool.Request()
-        req.data = bool(level)
+        req = self._SetIO.Request()
+        req.signal = "digital"
+        req.type = self.io_type
+        req.index = int(index)
+        req.value = float(value)
         fut = self._cli.call_async(req)
         rclpy.spin_until_future_complete(self.node, fut, timeout_sec=5.0)
         res = fut.result()
-        ok = bool(res and res.success)
-        if ok:
-            end = time.time() + self.settle
-            while time.time() < end:
-                rclpy.spin_once(self.node, timeout_sec=0.05)
-        return ok
+        if res is None or not res.ret:
+            msg = "" if res is None else res.message
+            self.node.get_logger().error(
+                f"工具端 DO_{index + 1}={value:g} 失败: {msg or '超时'}")
+            return False
+        return True
+
+    def _drive(self, on_index: int, off_index: int) -> bool:
+        if not self._set_do(off_index, 0.0):
+            return False
+        if not self._set_do(on_index, 1.0):
+            return False
+        end = time.time() + self.settle
+        while time.time() < end:
+            rclpy.spin_once(self.node, timeout_sec=0.05)
+        return True
 
     def open(self) -> bool:
-        return self._set(self.open_level)
+        self.node.get_logger().info(
+            f"夹爪张开: DO_{self.open_index + 1}=1, DO_{self.close_index + 1}=0")
+        return self._drive(self.open_index, self.close_index)
 
     def close(self, object_size: float | None = None) -> bool:
-        return self._set(self.closed_level)
+        self.node.get_logger().info(
+            f"夹爪闭合: DO_{self.close_index + 1}=1, DO_{self.open_index + 1}=0")
+        return self._drive(self.close_index, self.open_index)
 
     def close_ms(self) -> int:
         return int(self.settle * 1000)

@@ -135,12 +135,14 @@ track1:
   # 抓取时 TCP 的高度不写死: 由场景生成器按工件实际中心高度给出(见 scene 真值里的 z)
   # release_z 不写死: 由 release_tcp_z() 按工件尺寸算
   workpieces:
-    - {id: cube,     name: 正方体,   size: 0.050}
-    - {id: rod,      name: 长方体,   size: 0.050}
-    - {id: cylinder, name: 圆柱体,   size: 0.050}
-    - {id: hex,      name: 六角柱,   size: 0.050}
-    - {id: tri,      name: 三角柱,   size: 0.050}
-    - {id: cone,     name: 圆台,     size: 0.050}
+    # dims 按 x/y/z 记，必须与 MoveIt 碰撞体、Gazebo 镜像和抓取宽度一致。
+    # 尺寸与 track1_shapes.py 的基础组视觉分类标准件一致。
+    - {id: cube,     name: 正方体,   shape: box,      dims: [0.050, 0.050, 0.050]}
+    - {id: rod,      name: 长方体,   shape: box,      dims: [0.078, 0.032, 0.040]}
+    - {id: cylinder, name: 圆柱体,   shape: cylinder, dims: [0.050, 0.050, 0.050]}
+    - {id: hex,      name: 六角柱,   shape: box,      dims: [0.050, 0.050, 0.050]}
+    - {id: tri,      name: 三角柱,   shape: box,      dims: [0.056, 0.048, 0.046]}
+    - {id: cone,     name: 圆台,     shape: cylinder, dims: [0.052, 0.052, 0.042]}
 
 track2:
   # 散放区 x[-190,190] y[190,365] mm。

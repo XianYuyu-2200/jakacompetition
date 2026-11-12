@@ -29,6 +29,7 @@ def generate_launch_description():
     description = get_package_share_directory("jaka_description")
     moveit = get_package_share_directory("jaka_minicobo_moveit_config")
     world = os.path.join(kit, "worlds", "gemini305_preview.sdf")
+    gui_config = os.path.join(kit, "config", "gazebo_view_only.config")
     xacro_file = os.path.join(moveit, "config", "jaka_minicobo.urdf.xacro")
     joints = os.path.join(kit, "config", "gemini305_preview_joints.yaml")
     repo = ""
@@ -61,7 +62,9 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory("ros_gz_sim"), "launch", "gz_sim.launch.py")
         ),
-        launch_arguments={"gz_args": f"{world} -r"}.items(),
+        launch_arguments={
+            "gz_args": [world, " -r --gui-config ", LaunchConfiguration("gui_config")],
+        }.items(),
     )
     rsp = Node(
         package="robot_state_publisher",
@@ -126,9 +129,12 @@ def generate_launch_description():
         }],
     )
 
-    recognize = ExecuteProcess(
-        cmd=["python3", "-m", "jaka_competition_kit.track1_recognize"],
+    recognize = Node(
+        package="jaka_competition_kit",
+        executable="track1_recognize",
+        name="track1_recognize",
         output="screen",
+        parameters=[{"output_dir": LaunchConfiguration("output_dir")}],
         condition=UnlessCondition(LaunchConfiguration("learn")),
     )
 
@@ -191,6 +197,10 @@ def generate_launch_description():
         return [TimerAction(period=15.0, actions=delayed)]
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "gui_config", default_value=gui_config,
+            description="Gazebo GUI 配置；工作台模式只显示 3D 视口",
+        ),
         DeclareLaunchArgument("output_dir", default_value=repo_out),
         DeclareLaunchArgument(
             "learn", default_value="false",

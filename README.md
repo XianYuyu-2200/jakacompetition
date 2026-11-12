@@ -20,6 +20,7 @@ codex-competition/
 ├── setup/                  一键安装/打补丁/编译/启动脚本
 ├── verification/           仿真验证脚本 + 实测截图
 ├── dual_arm_demo/          双臂 operator/tracking 演示(基于本机械臂)
+├── perception/track1_sim/  基础组仿真练习(没有设备时的采集 / 训练 / 推理 / 抓取)
 ├── perception/track2_yolo/ 赛道二 20 类 YOLO11(采集 / 训练 / 识别)
 └── extras_linkerhand/      LinkerHand 灵巧手 ROS 2 SDK(末端执行器, 可选)
 ```
@@ -173,7 +174,10 @@ python3 verification/moveit_plan_exec.py 0.4,0.9,-1.1,0,1.0,0.6
 **verification/** — 验证脚本(URDF/FK 交叉验证、MoveIt 规划执行、姿态发布、
 抓屏转 PNG)和实测截图。
 
-**perception/track2_yolo/** — 赛道二固定 20 类的 YOLO11 检测（采集、按批次划分、训练、识别）。类别编号来自 `arena.yaml`，用法看这个目录里的 README。图和权重不进仓库。
+**perception/track1_sim/** — 只做基础组、现场没有机械臂和相机时看这份。
+`perception/track1_sim/README.md` 写了怎么用判分仿真把赛道一跑通，以及采集、训练、推理、按二维码抓取。打印转发用仓库根目录的 `基础组仿真教程.pdf`（`python3 design/build_track1_tutorial_pdf.py` 可重排）。图和权重不进仓库。
+
+**perception/track2_yolo/** — 赛道二固定 20 类的 YOLO11 检测（采集、按批次划分、训练、识别）。类别编号来自 `arena.yaml`，用法看这个目录里的 README。图和权重不进仓库。基础组的检测虚拟环境也装在这个目录的 `.venv` 里，路径不要改。
 
 **dual_arm_demo/** — 原 `jaka_dual_readonly`,用两台 JAKA mini 做的
 operator(192.168.0.101)/ tracking(192.168.0.102)只读跟随实验代码。

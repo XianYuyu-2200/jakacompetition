@@ -126,7 +126,8 @@ def _sim_stack(context):
             PythonLaunchDescriptionSource(PathJoinSubstitution([
                 FindPackageShare("jaka_minicobo_moveit_config"),
                 "launch", "demo_gazebo.launch.py"])),
-            launch_arguments={"use_gazebo": "true"}.items(),
+            launch_arguments={"use_gazebo": "true",
+                              "use_rviz": LaunchConfiguration("use_rviz")}.items(),
         ))
         # 把场地(工作台/工位板/料盒/二维码/工件)镜像进 Gazebo,
         # 否则 Gazebo 画面只有机械臂悬在空地上。
@@ -159,6 +160,7 @@ def generate_launch_description():
             "seed": LaunchConfiguration("seed"),
             "team": LaunchConfiguration("team"),
             "round": LaunchConfiguration("round"),
+            "output_dir": LaunchConfiguration("output_dir"),
         }.items(),
     )
     # ref_track1 / ref_track2 只差最后一位, 直接用 track 拼出可执行名
@@ -202,6 +204,9 @@ def generate_launch_description():
         DeclareLaunchArgument("team", default_value="demo_team"),
         DeclareLaunchArgument("round", default_value="R1"),
         DeclareLaunchArgument("run_reference", default_value="true"),
+        DeclareLaunchArgument("use_rviz", default_value="true",
+                              description="Gazebo 模式下是否额外启动 RViz"),
+        DeclareLaunchArgument("output_dir", default_value="~/.ros/jaka_competition"),
         DeclareLaunchArgument("vel_scale", default_value="0.5"),
         DeclareLaunchArgument("gripper", default_value="sim"),
         # 冲突检查必须排在最前 —— launch 按顺序执行, 排在后面的话

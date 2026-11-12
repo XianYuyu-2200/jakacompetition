@@ -1,0 +1,4 @@
+No,Filename,Width,Height,AspectRatio,PixelAspectRatio,SourceDisplayRatio,RatioSource,Format,HasTransparentPixels,UsageCount,DisplayRatioVariants,AssetKind,SvgRenderable,PptxNativeSupported,SizeKB,Category
+1,fig_arena_track1.png,1800,1440,1.25,1.25,,native,PNG,False,1,,bitmap,True,True,150.8,Standard landscape
+2,fig_arena_track2.png,1839,1480,1.24,1.24,,native,PNG,False,1,,bitmap,True,True,189.7,Standard landscape
+3,reach_envelope.png,1260,980,1.29,1.29,,native,PNG,False,1,,bitmap,True,True,81.7,Standard landscape

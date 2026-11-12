@@ -1,0 +1,52 @@
+"""不要求预先 source ROS 的工作台入口。"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="JAKA 基础组仿真学习工作台")
+    parser.add_argument("--demo", action="store_true", help="只演示界面，不启动 ROS 或机械臂")
+    parser.add_argument("--root", type=Path, help="工程根目录（默认自动定位）")
+    parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get(
+        "XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "jaka-workbench")
+    parser.add_argument("--check", action="store_true", help="输出 JSON 环境检查，不启动界面")
+    parser.add_argument("--mode", choices=("basic", "recognition", "vision"), default="basic")
+    args = parser.parse_args(argv)
+    from .runtime import check_environment, discover_root, simulation_conflicts
+    try:
+        root = discover_root(args.root) if args.root else discover_root()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.check:
+        checks = check_environment(root, args.mode)
+        print(json.dumps({"root": str(root), "mode": args.mode, "checks": checks,
+                          "conflicts": simulation_conflicts()}, ensure_ascii=False, indent=2))
+        return 1 if any(c["level"] == "error" for c in checks) else 0
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+                               or os.environ.get("QT_QPA_PLATFORM")):
+        print("没有图形桌面。请在 Ubuntu 桌面终端运行，或使用 --check 自检。", file=sys.stderr)
+        return 2
+    try:
+        from PyQt5.QtWidgets import QApplication
+        from .app import WorkbenchWindow
+    except ImportError as exc:
+        print(f"工作台界面依赖未就绪：{exc}\n可安装 python3-pyqt5 后重试。", file=sys.stderr)
+        return 2
+    # 只传程序名，避免 Qt 误处理工作台参数。
+    app = QApplication([sys.argv[0]])
+    app.setApplicationName("基础组学习工作台")
+    app.setOrganizationName("JAKACompetitionLearning")
+    window = WorkbenchWindow(root, args.data_dir.expanduser().resolve(),
+                             demo=args.demo, mode=args.mode)
+    window.show()
+    return app.exec_()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

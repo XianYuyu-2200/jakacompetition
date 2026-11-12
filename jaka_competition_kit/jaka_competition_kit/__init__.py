@@ -4,7 +4,7 @@
   arena           赛场几何(唯一真源)与合法性校核
   qr              二维码生成 / 解析
   backend         MoveGroup 动作客户端(仿真与真机接口一致)
-  gripper         夹爪抽象(Mock / JAKA IO)
+  gripper         夹爪抽象(Sim / Wheeltec / JAKA 工具端 NPN / Mock)
   executor        抓取原语
   scene_generator 场景生成器(ROS 2 节点)
   scorer          自动计时判分(ROS 2 节点)
