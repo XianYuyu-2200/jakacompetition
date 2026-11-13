@@ -1235,7 +1235,11 @@ class WorkbenchWindow(QMainWindow):
             if isinstance(values, list) and len(values) == 6:
                 for spin, value in zip(self.joint_spins, values):
                     spin.blockSignals(True); spin.setValue(float(value)); spin.blockSignals(False)
-                self.pose_status.setText("已载入已保存姿态。")
+                self.pose_status.setText("已载入已保存姿态；不会自动移动机械臂。")
+            elif phase == "transfer":
+                self.pose_status.setText("转场只使用路点；输入框保留原值，请确认后再追加。")
+            else:
+                self.pose_status.setText("此阶段尚未记录；输入框保留原值，请确认后再移动或记录。")
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self.pose_status.setText(f"姿态配置读取失败：{exc}")
 

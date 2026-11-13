@@ -59,6 +59,45 @@ class AppTests(unittest.TestCase):
         self.assertEqual(len(data["objects"]["6"]["transfer_via_joints"]), 1)
         self.assertNotIn("transfer_joints", data["objects"]["6"])
 
+    def test_all_station_and_place_poses_can_be_recorded_in_editor(self):
+        import yaml
+        for station in range(1, 7):
+            self.window.pose_station.setValue(station)
+            for phase_index in range(3):
+                self.window.pose_phase.setCurrentIndex(phase_index)
+                for spin in self.window.joint_spins:
+                    spin.setValue(station / 10 + phase_index / 100)
+                self.window._record_pose()
+        for phase_index in range(4, 7):
+            self.window.pose_phase.setCurrentIndex(phase_index)
+            for spin in self.window.joint_spins:
+                spin.setValue(phase_index / 10)
+            self.window._record_pose()
+        data = yaml.safe_load(self.window._pose_path().read_text(encoding="utf-8"))
+        self.assertTrue(data["enabled"])
+        self.assertFalse(data["calibration"]["verified"])
+        for station in range(1, 7):
+            for index, phase in enumerate(("approach", "grasp", "lift")):
+                self.assertAlmostEqual(data["objects"][str(station)][phase + "_joints"][0],
+                                       station / 10 + index / 100)
+        self.assertEqual(set(data["place"]),
+                         {"approach_joints", "release_joints", "retreat_joints"})
+        self.window.pose_station.setValue(4)
+        self.window.pose_phase.setCurrentIndex(1)
+        self.assertAlmostEqual(self.window.joint_spins[0].value(), .41)
+        self.assertIn("不会自动移动", self.window.pose_status.text())
+
+    def test_unrecorded_stage_warns_that_previous_inputs_remain(self):
+        for spin in self.window.joint_spins:
+            spin.setValue(.25)
+        self.window._record_pose()
+        self.window.pose_station.setValue(2)
+        self.assertEqual(self.window.joint_spins[0].value(), .25)
+        self.assertIn("尚未记录", self.window.pose_status.text())
+        self.assertIn("保留原值", self.window.pose_status.text())
+        self.window.pose_phase.setCurrentIndex(3)
+        self.assertIn("转场只使用路点", self.window.pose_status.text())
+
     def test_initial_state_disables_motion(self):
         self.assertTrue(self.window.launch_button.isEnabled())
         self.assertFalse(self.window.reference_button.isEnabled())
