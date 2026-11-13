@@ -416,6 +416,7 @@ class WorkbenchWindow(QMainWindow):
         self.pose_station = QSpinBox()
         self.pose_station.setRange(1, 6)
         self.pose_station.setValue(1)
+        self.pose_station.valueChanged.connect(self._pose_phase_changed)
         pose_grid.addWidget(self.pose_station, 0, 1)
         pose_grid.addWidget(_label("姿态阶段", "muted"), 0, 2)
         self.pose_phase = QComboBox()
@@ -446,6 +447,12 @@ class WorkbenchWindow(QMainWindow):
         self.pose_status = _label("等待仿真关节状态。", "muted")
         pose_buttons.addWidget(self.pose_status, 1)
         pose_layout.addLayout(pose_buttons)
+        waypoint_buttons = QHBoxLayout()
+        waypoint_buttons.addWidget(_button("追加阶段前路点", self._append_waypoint))
+        waypoint_buttons.addWidget(_button("清空阶段前路点", self._clear_waypoints))
+        self.waypoint_status = _label("中间路点按记录顺序在所选阶段之前执行；更改后须重新验收。", "muted")
+        waypoint_buttons.addWidget(self.waypoint_status, 1)
+        pose_layout.addLayout(waypoint_buttons)
         self.pose_file_label = _label(f"配置：{self._pose_path()}", "muted")
         pose_layout.addWidget(self.pose_file_label)
         layout.addWidget(pose_card)
@@ -1217,6 +1224,13 @@ class WorkbenchWindow(QMainWindow):
             target = (data.get("objects", {}).get(str(self.pose_station.value()), {})
                       if kind == "object" else data.get("place", {}))
             values = target.get(f"{phase}_joints") if isinstance(target, dict) else None
+            points = self._fixed_pose_api().waypoints_for(target, phase)
+            if hasattr(self, "waypoint_status"):
+                self.waypoint_status.setText(
+                    f"所选阶段前路点：{len(points)} 个，按录入顺序执行；需完整回放验收。")
+                self.waypoint_status.setToolTip("\n".join(
+                    f"{i}: " + ", ".join(f"{v:.4f}" for v in point)
+                    for i, point in enumerate(points, 1)) or "暂无路点")
             if isinstance(values, list) and len(values) == 6:
                 for spin, value in zip(self.joint_spins, values):
                     spin.blockSignals(True); spin.setValue(float(value)); spin.blockSignals(False)
@@ -1266,6 +1280,34 @@ class WorkbenchWindow(QMainWindow):
             self._log(f"已记录固定姿态：{kind} {phase} -> {path}")
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self.pose_status.setText(f"保存失败：{exc}")
+
+
+    def _append_waypoint(self):
+        self._edit_waypoints(clear=False)
+
+    def _clear_waypoints(self):
+        if QMessageBox.question(self, "清空中间路点",
+                                "确认清空当前工位、当前阶段的全部中间路点？清空后须重新验收。") != QMessageBox.Yes:
+            return
+        self._edit_waypoints(clear=True)
+
+    def _edit_waypoints(self, *, clear):
+        try:
+            kind, phase = self._pose_key()
+            station = self.pose_station.value() if kind == "object" else None
+            values = None if clear else [spin.value() for spin in self.joint_spins]
+            data = self._fixed_pose_api().update_waypoints(
+                str(self._pose_path()), station=station, phase=phase, joints=values, clear=clear)
+            target = data["objects"][str(station)] if station is not None else data["place"]
+            count = len(self._fixed_pose_api().waypoints_for(target, phase))
+            self.waypoint_status.setText(f"所选阶段前路点：{count} 个；配置已更改，须重新验收。")
+            points = self._fixed_pose_api().waypoints_for(target, phase)
+            self.waypoint_status.setToolTip("\n".join(
+                f"{i}: " + ", ".join(f"{v:.4f}" for v in point)
+                for i, point in enumerate(points, 1)) or "暂无路点")
+            self._log(f"{'清空' if clear else '追加'}中间路点：{kind} {station or ''} {phase}")
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            self.waypoint_status.setText(f"中间路点保存失败：{exc}")
 
 
     def choose_program(self):

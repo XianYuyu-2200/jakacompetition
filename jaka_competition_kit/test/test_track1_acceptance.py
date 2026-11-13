@@ -101,3 +101,30 @@ def test_fixed_selfcheck_warns_that_plans_are_independent(monkeypatch):
     assert calls == [True] * 6
     assert any('不验证点间连续轨迹' in msg for _, msg in logger.messages)
     assert any('非连续流程验收' in msg for _, msg in logger.messages)
+
+
+def test_waypoint_execution_order_and_failure_stop():
+    from jaka_competition_kit.executor import Executor
+    pose = lambda n: [float(n)] * 6
+    entry = {'approach_via_joints': [pose(1), pose(2)], 'approach_joints': pose(3),
+             'grasp_joints': pose(4), 'lift_joints': pose(5)}
+    place = {'approach_via_joints': [pose(6)], 'approach_joints': pose(7),
+             'release_joints': pose(8), 'retreat_joints': pose(9)}
+    poses = {'objects': {'6': entry}, 'place': place}
+    obj = {'station': 6, 'id': 'wp_6', 'xy': (0, 0), 'z': 0, 'dims': [0.04] * 3}
+    calls = []
+    def goto(j):
+        calls.append(j[0])
+        return SimpleNamespace(ok=True)
+    arm = SimpleNamespace(backend=SimpleNamespace(goto_joints=goto), node=SimpleNamespace(get_logger=Logger),
+                          tcp_pose=lambda: ([0, 0, 0], None), grasp=lambda *a, **kw: True,
+                          release=lambda *a: True, last_failure='')
+    assert Executor.fixed_pick_and_place(arm, obj, None, poses)
+    assert calls == list(range(1, 10))
+    calls.clear()
+    def fail(j):
+        calls.append(j[0])
+        return SimpleNamespace(ok=j[0] != 2)
+    arm.backend.goto_joints = fail
+    assert not Executor.fixed_pick_and_place(arm, obj, None, poses)
+    assert calls == [1, 2] and arm.last_failure == 'motion'

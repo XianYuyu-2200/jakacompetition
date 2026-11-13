@@ -9,7 +9,8 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
 import yaml
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+MAX_WAYPOINTS = 10
 JOINT_NAMES = [f"joint_{i}" for i in range(1, 7)]
 PHASES = ("approach", "grasp", "lift", "release", "retreat")
 OBJECT_PHASES = ("approach", "grasp", "lift")
@@ -47,22 +48,45 @@ def validate_joints(values: Iterable[float], *,
     return out
 
 
+
+def _validate_waypoints(entry: Mapping[str, Any], phase: str, version: int) -> None:
+    key = f"{phase}_via_joints"
+    if key not in entry:
+        return
+    if version < 3:
+        raise ValueError("旧版本固定姿态不能包含中间路点")
+    points = entry[key]
+    if not isinstance(points, list) or len(points) > MAX_WAYPOINTS:
+        raise ValueError(f"{key} 必须是最多 {MAX_WAYPOINTS} 个关节姿态的列表")
+    for point in points:
+        if not isinstance(point, list):
+            raise ValueError(f"{key} 中每个路点必须是关节角列表")
+        validate_joints(point)
+
+
+def waypoints_for(entry: Mapping[str, Any], phase: str) -> list[list[float]]:
+    _validate_waypoints(entry, phase, SCHEMA_VERSION)
+    return [validate_joints(p) for p in entry.get(f"{phase}_via_joints", [])]
+
 def _validate_document(raw: Any, *, allow_legacy: bool = True) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("固定姿态文件必须是 YAML 对象")
     version = raw.get("version", 1)
     if not isinstance(version, int) or isinstance(version, bool):
         raise ValueError("固定姿态 version 必须是整数")
-    if version not in (1, SCHEMA_VERSION) or (version == 1 and not allow_legacy):
+    if version not in (1, 2, SCHEMA_VERSION) or (version == 1 and not allow_legacy):
         raise ValueError(f"不支持固定姿态配置版本：{version}")
     if version == 1:
-        # 旧格式只兼容读取，不假定其校准来源；落盘时升级为 v2。
+        # 旧格式只兼容读取，不假定其校准来源；落盘时升级为 v3。
         raw = dict(raw)
         raw.update(version=SCHEMA_VERSION, enabled=False, backend="simulation",
                    device_profile="jaka_mini_2_gemini305_gripper_sim",
                    joint_names=JOINT_NAMES.copy(), angle_unit="rad",
                    calibration={"source": "legacy-v1", "verified": False,
                                  "requires_recalibration": True})
+    if version == 2:
+        raw = dict(raw)
+        raw["version"] = SCHEMA_VERSION
     if raw.get("backend") not in ("simulation", "hardware"):
         raise ValueError("固定姿态 backend 必须是 simulation 或 hardware")
     if not isinstance(raw.get("device_profile"), str) or not raw["device_profile"].strip():
@@ -86,10 +110,12 @@ def _validate_document(raw: Any, *, allow_legacy: bool = True) -> Dict[str, Any]
             value = entry.get(f"{phase}_joints", entry.get(phase))
             if value is not None:
                 validate_joints(value)
+            _validate_waypoints(entry, phase, version)
     for phase in PLACE_PHASES:
         value = place.get(f"{phase}_joints", place.get(phase))
         if value is not None:
             validate_joints(value)
+        _validate_waypoints(place, phase, version)
     calibration = raw.get("calibration", {})
     if not isinstance(calibration, dict):
         raise ValueError("calibration 必须是对象")
@@ -187,6 +213,11 @@ def update_pose(path: str, *, station: Optional[int], phase: str,
             raise ValueError("夹爪参数必须是有限数值")
         target[f"{phase}_gripper"] = gripper
     data["enabled"] = is_complete({**data, "enabled": True})
+    data.setdefault("calibration", {})["verified"] = False
+    return _save_document(path, data)
+
+
+def _save_document(path: str, data: Dict[str, Any]) -> Dict[str, Any]:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",
@@ -204,3 +235,33 @@ def update_pose(path: str, *, station: Optional[int], phase: str,
             pass
         raise
     return data
+
+
+def update_waypoints(path: str, *, station: Optional[int], phase: str,
+                     joints: Optional[Iterable[float]] = None, clear: bool = False,
+                     backend: str = "simulation",
+                     device_profile: str = "jaka_mini_2_gemini305_gripper_sim") -> Dict[str, Any]:
+    """Append a point executed before a phase, or clear that phase's points."""
+    allowed = OBJECT_PHASES if station is not None else PLACE_PHASES
+    if phase not in allowed or (station is not None and int(station) not in range(1, 7)):
+        raise ValueError("无效的工位或姿态阶段")
+    if clear == (joints is not None):
+        raise ValueError("请选择追加路点或清空路点")
+    data = load_fixed_poses(path)
+    if data["backend"] != backend or data["device_profile"] != device_profile:
+        raise ValueError("不能将不同 backend/device_profile 的姿态混写")
+    if data.get("calibration", {}).get("requires_recalibration"):
+        raise ValueError("旧配置须先重新录入基本姿态")
+    target = data["objects"].setdefault(str(int(station)), {}) if station is not None else data["place"]
+    key = f"{phase}_via_joints"
+    points = waypoints_for(target, phase)
+    if clear:
+        target.pop(key, None)
+    else:
+        if len(points) >= MAX_WAYPOINTS:
+            raise ValueError(f"每个阶段最多 {MAX_WAYPOINTS} 个中间路点")
+        points.append(validate_joints(joints))
+        target[key] = points
+    data.setdefault("calibration", {})["verified"] = False
+    # Changing a route must never implicitly enable a previously disabled configuration.
+    return _save_document(path, data)

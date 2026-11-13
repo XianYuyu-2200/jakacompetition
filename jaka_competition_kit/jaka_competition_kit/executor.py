@@ -347,7 +347,7 @@ class Executor:
 
         ``poses`` 已由 fixed_poses 模块校验；这里故意不从场景读取二维码顺序，
         只消费当前循环传入的 station 对象。固定姿态缺失时返回 False，由参考
-        程序回退到原有的安全笛卡尔基础流程。
+        程序停止本轮，绝不自动回退。
         """
         station = int(obj.get("station", 0))
         def get(phase, place=False):
@@ -359,7 +359,16 @@ class Executor:
         if any(v is None for v in phases):
             return False
         self.last_failure = ""
-        def move(joints, phase):
+        def move(joints, phase, place=False):
+            from .fixed_poses import waypoints_for
+            target = poses["place"] if place else poses["objects"][str(station)]
+            for index, waypoint in enumerate(waypoints_for(target, phase), 1):
+                result = self.backend.goto_joints(waypoint)
+                if not result.ok:
+                    self.last_failure = "motion"
+                    self.node.get_logger().error(
+                        f"工位{station} 固定姿态阶段 {phase} 中间路点 {index} 失败: {result}")
+                    return False
             result = self.backend.goto_joints(joints)
             if not result.ok:
                 self.last_failure = "motion"
@@ -385,15 +394,15 @@ class Executor:
             return False
         if not move(phases[2], "lift"):
             return False
-        if not move(phases[3], "place_approach"):
+        if not move(phases[3], "approach", place=True):
             return False
-        if not move(phases[4], "release"):
+        if not move(phases[4], "release", place=True):
             return False
         if not self.release(obj["id"], bin_box):
             self.last_failure = "release"
             self.node.get_logger().error(f"工位{station} 夹爪张开或释放失败")
             return False
-        if not move(phases[5], "retreat"):
+        if not move(phases[5], "retreat", place=True):
             return False
         return True
 

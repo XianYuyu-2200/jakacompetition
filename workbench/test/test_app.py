@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from workbench.app import WorkbenchWindow
 from workbench.ros_bridge import readiness, PREFIX
@@ -31,6 +31,22 @@ class AppTests(unittest.TestCase):
         self.window.close()
         self.qt.processEvents()
         self.directory.cleanup()
+
+    def test_waypoint_editor_records_order_and_refreshes_station(self):
+        self.window.pose_station.setValue(6)
+        for value in (0.1, 0.2):
+            for spin in self.window.joint_spins:
+                spin.setValue(value)
+            self.window._append_waypoint()
+        self.assertIn("2 个", self.window.waypoint_status.text())
+        self.assertIn("0.1000", self.window.waypoint_status.toolTip())
+        self.window.pose_station.setValue(5)
+        self.assertIn("0 个", self.window.waypoint_status.text())
+        self.window.pose_station.setValue(6)
+        self.assertIn("2 个", self.window.waypoint_status.text())
+        with patch('workbench.app.QMessageBox.question', return_value=QMessageBox.Yes):
+            self.window._clear_waypoints()
+        self.assertIn("0 个", self.window.waypoint_status.text())
 
     def test_initial_state_disables_motion(self):
         self.assertTrue(self.window.launch_button.isEnabled())
@@ -66,7 +82,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(pose_path.exists())
         import yaml
         data = yaml.safe_load(pose_path.read_text(encoding="utf-8"))
-        self.assertEqual(data["version"], 2)
+        self.assertEqual(data["version"], 3)
         self.assertEqual(data["backend"], "simulation")
         self.assertEqual(data["device_profile"], "jaka_mini_2_gemini305_gripper_sim")
         self.assertFalse(data["enabled"])

@@ -22,7 +22,7 @@ from std_msgs.msg import String
 from .arena import load_arena
 from .backend import MoveGroupBackend
 from .executor import Executor
-from .fixed_poses import default_fixed_pose_path, is_complete, load_fixed_poses
+from .fixed_poses import default_fixed_pose_path, is_complete, load_fixed_poses, waypoints_for
 from .gripper import make_gripper
 from .scene import SceneClient
 
@@ -190,10 +190,13 @@ class ReferenceBase(rclpy.node.Node):
             use_fixed = (self.scene.get("track") == 1 and fixed_ready
                          and bool(obj.get("station")))
             if use_fixed and verify_only:
-                phases = [self.fixed_poses["objects"][str(obj["station"])][p]
-                          for p in ("approach_joints", "grasp_joints", "lift_joints")]
-                phases += [self.fixed_poses["place"][p] for p in
-                           ("approach_joints", "release_joints", "retreat_joints")]
+                phases = []
+                for entry, names in ((self.fixed_poses["objects"][str(obj["station"])],
+                                      ("approach", "grasp", "lift")),
+                                     (self.fixed_poses["place"], ("approach", "release", "retreat"))):
+                    for phase in names:
+                        phases.extend(waypoints_for(entry, phase))
+                        phases.append(entry.get(f"{phase}_joints", entry.get(phase)))
                 results = [self.backend.goto_joints(j, plan_only=True) for j in phases]
                 ok += int(all(r.ok for r in results))
                 self.get_logger().info(f"    固定姿态独立目标规划自检: {sum(r.ok for r in results)}/{len(results)}（非连续流程验收）")
