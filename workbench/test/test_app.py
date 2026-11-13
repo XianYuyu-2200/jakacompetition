@@ -48,6 +48,17 @@ class AppTests(unittest.TestCase):
             self.window._clear_waypoints()
         self.assertIn("0 个", self.window.waypoint_status.text())
 
+    def test_station_transfer_waypoint_does_not_create_fixed_pose(self):
+        self.window.pose_station.setValue(6)
+        self.window.pose_phase.setCurrentIndex(self.window.pose_phase.findData("object:transfer"))
+        self.window._record_pose()
+        self.assertIn("追加", self.window.pose_status.text())
+        self.window._append_waypoint()
+        import yaml
+        data = yaml.safe_load(self.window._pose_path().read_text(encoding="utf-8"))
+        self.assertEqual(len(data["objects"]["6"]["transfer_via_joints"]), 1)
+        self.assertNotIn("transfer_joints", data["objects"]["6"])
+
     def test_initial_state_disables_motion(self):
         self.assertTrue(self.window.launch_button.isEnabled())
         self.assertFalse(self.window.reference_button.isEnabled())
@@ -82,7 +93,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(pose_path.exists())
         import yaml
         data = yaml.safe_load(pose_path.read_text(encoding="utf-8"))
-        self.assertEqual(data["version"], 3)
+        self.assertEqual(data["version"], 4)
         self.assertEqual(data["backend"], "simulation")
         self.assertEqual(data["device_profile"], "jaka_mini_2_gemini305_gripper_sim")
         self.assertFalse(data["enabled"])

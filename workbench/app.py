@@ -423,6 +423,7 @@ class WorkbenchWindow(QMainWindow):
         for label, value in (("预抓取（编号）", "object:approach"),
                              ("抓取（编号）", "object:grasp"),
                              ("抬升（编号）", "object:lift"),
+                             ("抓取后转场路点（编号）", "object:transfer"),
                              ("投放前（料盒）", "place:approach"),
                              ("投放（料盒）", "place:release"),
                              ("退出（料盒）", "place:retreat")):
@@ -450,7 +451,7 @@ class WorkbenchWindow(QMainWindow):
         waypoint_buttons = QHBoxLayout()
         waypoint_buttons.addWidget(_button("追加阶段前路点", self._append_waypoint))
         waypoint_buttons.addWidget(_button("清空阶段前路点", self._clear_waypoints))
-        self.waypoint_status = _label("中间路点按记录顺序在所选阶段之前执行；更改后须重新验收。", "muted")
+        self.waypoint_status = _label("中间路点按顺序在所选阶段前执行；抓取后转场在抬升后执行。", "muted")
         waypoint_buttons.addWidget(self.waypoint_status, 1)
         pose_layout.addLayout(waypoint_buttons)
         self.pose_file_label = _label(f"配置：{self._pose_path()}", "muted")
@@ -1269,6 +1270,9 @@ class WorkbenchWindow(QMainWindow):
         path = self._pose_path()
         try:
             kind, phase = self._pose_key()
+            if phase == "transfer":
+                self.pose_status.setText("抓取后转场请使用‘追加阶段前路点’按钮记录，可依次追加多个路点。")
+                return
             api = self._fixed_pose_api()
             data = api.update_pose(
                 str(path), station=self.pose_station.value() if kind == "object" else None,

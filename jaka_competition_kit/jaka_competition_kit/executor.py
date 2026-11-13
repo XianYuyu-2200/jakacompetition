@@ -369,6 +369,8 @@ class Executor:
                     self.node.get_logger().error(
                         f"工位{station} 固定姿态阶段 {phase} 中间路点 {index} 失败: {result}")
                     return False
+            if joints is None:
+                return True
             result = self.backend.goto_joints(joints)
             if not result.ok:
                 self.last_failure = "motion"
@@ -393,6 +395,8 @@ class Executor:
             self.node.get_logger().error(f"工位{station} 夹爪闭合或附着失败")
             return False
         if not move(phases[2], "lift"):
+            return False
+        if not move(None, "transfer"):
             return False
         if not move(phases[3], "approach", place=True):
             return False

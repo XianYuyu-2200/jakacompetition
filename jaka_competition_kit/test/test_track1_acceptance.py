@@ -107,7 +107,7 @@ def test_waypoint_execution_order_and_failure_stop():
     from jaka_competition_kit.executor import Executor
     pose = lambda n: [float(n)] * 6
     entry = {'approach_via_joints': [pose(1), pose(2)], 'approach_joints': pose(3),
-             'grasp_joints': pose(4), 'lift_joints': pose(5)}
+             'grasp_joints': pose(4), 'lift_joints': pose(5), 'transfer_via_joints': [pose(5.5)]}
     place = {'approach_via_joints': [pose(6)], 'approach_joints': pose(7),
              'release_joints': pose(8), 'retreat_joints': pose(9)}
     poses = {'objects': {'6': entry}, 'place': place}
@@ -120,7 +120,7 @@ def test_waypoint_execution_order_and_failure_stop():
                           tcp_pose=lambda: ([0, 0, 0], None), grasp=lambda *a, **kw: True,
                           release=lambda *a: True, last_failure='')
     assert Executor.fixed_pick_and_place(arm, obj, None, poses)
-    assert calls == list(range(1, 10))
+    assert calls == [1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9]
     calls.clear()
     def fail(j):
         calls.append(j[0])
@@ -128,3 +128,22 @@ def test_waypoint_execution_order_and_failure_stop():
     arm.backend.goto_joints = fail
     assert not Executor.fixed_pick_and_place(arm, obj, None, poses)
     assert calls == [1, 2] and arm.last_failure == 'motion'
+
+
+def test_station_transfer_failure_stops_before_place():
+    from jaka_competition_kit.executor import Executor
+    pose = lambda n: [float(n)] * 6
+    poses = {'objects': {'6': {'approach_joints': pose(1), 'grasp_joints': pose(2),
+                               'lift_joints': pose(3), 'transfer_via_joints': [pose(4), pose(5)]}},
+             'place': {'approach_joints': pose(6), 'release_joints': pose(7), 'retreat_joints': pose(8)}}
+    obj = {'station': 6, 'id': 'wp_6', 'xy': (0, 0), 'z': 0, 'dims': [0.04] * 3}
+    calls = []
+    def goto(j):
+        calls.append(j[0])
+        return SimpleNamespace(ok=j[0] != 4)
+    releases = []
+    arm = SimpleNamespace(backend=SimpleNamespace(goto_joints=goto), node=SimpleNamespace(get_logger=Logger),
+                          tcp_pose=lambda: ([0, 0, 0], None), grasp=lambda *a, **kw: True,
+                          release=lambda *a: releases.append(True), last_failure='')
+    assert not Executor.fixed_pick_and_place(arm, obj, None, poses)
+    assert calls == [1, 2, 3, 4] and arm.last_failure == 'motion' and not releases

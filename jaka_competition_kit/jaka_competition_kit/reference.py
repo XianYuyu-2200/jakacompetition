@@ -191,12 +191,13 @@ class ReferenceBase(rclpy.node.Node):
                          and bool(obj.get("station")))
             if use_fixed and verify_only:
                 phases = []
-                for entry, names in ((self.fixed_poses["objects"][str(obj["station"])],
-                                      ("approach", "grasp", "lift")),
+                object_entry = self.fixed_poses["objects"][str(obj["station"])]
+                for entry, names in ((object_entry, ("approach", "grasp", "lift", "transfer")),
                                      (self.fixed_poses["place"], ("approach", "release", "retreat"))):
                     for phase in names:
                         phases.extend(waypoints_for(entry, phase))
-                        phases.append(entry.get(f"{phase}_joints", entry.get(phase)))
+                        if phase != "transfer":
+                            phases.append(entry.get(f"{phase}_joints", entry.get(phase)))
                 results = [self.backend.goto_joints(j, plan_only=True) for j in phases]
                 ok += int(all(r.ok for r in results))
                 self.get_logger().info(f"    固定姿态独立目标规划自检: {sum(r.ok for r in results)}/{len(results)}（非连续流程验收）")

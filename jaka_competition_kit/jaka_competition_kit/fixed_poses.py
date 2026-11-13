@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
 import yaml
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MAX_WAYPOINTS = 10
 JOINT_NAMES = [f"joint_{i}" for i in range(1, 7)]
 PHASES = ("approach", "grasp", "lift", "release", "retreat")
@@ -74,17 +74,17 @@ def _validate_document(raw: Any, *, allow_legacy: bool = True) -> Dict[str, Any]
     version = raw.get("version", 1)
     if not isinstance(version, int) or isinstance(version, bool):
         raise ValueError("固定姿态 version 必须是整数")
-    if version not in (1, 2, SCHEMA_VERSION) or (version == 1 and not allow_legacy):
+    if version not in (1, 2, 3, SCHEMA_VERSION) or (version == 1 and not allow_legacy):
         raise ValueError(f"不支持固定姿态配置版本：{version}")
     if version == 1:
-        # 旧格式只兼容读取，不假定其校准来源；落盘时升级为 v3。
+        # 旧格式只兼容读取，不假定其校准来源；落盘时升级为 v4。
         raw = dict(raw)
         raw.update(version=SCHEMA_VERSION, enabled=False, backend="simulation",
                    device_profile="jaka_mini_2_gemini305_gripper_sim",
                    joint_names=JOINT_NAMES.copy(), angle_unit="rad",
                    calibration={"source": "legacy-v1", "verified": False,
                                  "requires_recalibration": True})
-    if version == 2:
+    if version in (2, 3):
         raw = dict(raw)
         raw["version"] = SCHEMA_VERSION
     if raw.get("backend") not in ("simulation", "hardware"):
@@ -106,6 +106,9 @@ def _validate_document(raw: Any, *, allow_legacy: bool = True) -> Dict[str, Any]
     for station, entry in objects.items():
         if not isinstance(entry, dict):
             raise ValueError(f"工位 {station} 的姿态必须是对象")
+        if "transfer_via_joints" in entry and version < 4:
+            raise ValueError("旧版本固定姿态不能包含工位转场路点")
+        _validate_waypoints(entry, "transfer", version)
         for phase in OBJECT_PHASES:
             value = entry.get(f"{phase}_joints", entry.get(phase))
             if value is not None:
@@ -242,7 +245,7 @@ def update_waypoints(path: str, *, station: Optional[int], phase: str,
                      backend: str = "simulation",
                      device_profile: str = "jaka_mini_2_gemini305_gripper_sim") -> Dict[str, Any]:
     """Append a point executed before a phase, or clear that phase's points."""
-    allowed = OBJECT_PHASES if station is not None else PLACE_PHASES
+    allowed = (*OBJECT_PHASES, "transfer") if station is not None else PLACE_PHASES
     if phase not in allowed or (station is not None and int(station) not in range(1, 7)):
         raise ValueError("无效的工位或姿态阶段")
     if clear == (joints is not None):

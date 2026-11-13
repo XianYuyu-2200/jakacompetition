@@ -50,7 +50,7 @@ def test_rejects_unknown_schema_and_station(tmp_path):
 def test_atomic_updates_create_profiled_v2_and_remain_disabled_until_complete(tmp_path):
     path = tmp_path / "poses.yaml"
     data = update_pose(str(path), station=1, phase="grasp", joints=[0.1] * 6)
-    assert data["version"] == 3
+    assert data["version"] == 4
     assert data["backend"] == "simulation"
     assert data["joint_names"] == [f"joint_{i}" for i in range(1, 7)]
     assert data["angle_unit"] == "rad"
@@ -112,7 +112,7 @@ def test_waypoints_migrate_v2_are_ordered_and_disabled_stays_disabled(tmp_path):
     path = tmp_path / 'poses.yaml'
     path.write_text(Path('jaka_competition_kit/config/track1_fixed_poses.yaml').read_text())
     data = update_waypoints(str(path), station=6, phase='approach', joints=[.1] * 6)
-    assert data['version'] == 3 and not data['enabled']
+    assert data['version'] == 4 and not data['enabled']
     data = update_waypoints(str(path), station=6, phase='approach', joints=[.2] * 6)
     assert waypoints_for(load_fixed_poses(str(path))['objects']['6'], 'approach') == [[.1] * 6, [.2] * 6]
     data = update_waypoints(str(path), station=6, phase='approach', clear=True)
@@ -135,3 +135,18 @@ def test_bad_waypoints_and_v2_waypoint_rejected(tmp_path):
         load_fixed_poses(str(path))
     with pytest.raises(ValueError):
         update_waypoints(str(tmp_path / 'new.yaml'), station=6, phase='release', joints=[0] * 6)
+
+
+def test_station_transfer_is_versioned_and_independent(tmp_path):
+    from jaka_competition_kit.fixed_poses import update_waypoints, waypoints_for
+    path = tmp_path / 'poses.yaml'
+    data = update_waypoints(str(path), station=6, phase='transfer', joints=[0.1] * 6)
+    assert data['version'] == 4
+    assert waypoints_for(data['objects']['6'], 'transfer') == [[0.1] * 6]
+    assert not data['objects'].get('5')
+    data['version'] = 3
+    path.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValueError, match='旧版本'):
+        load_fixed_poses(str(path))
+    with pytest.raises(ValueError):
+        update_waypoints(str(tmp_path / 'x.yaml'), station=None, phase='transfer', joints=[0] * 6)
