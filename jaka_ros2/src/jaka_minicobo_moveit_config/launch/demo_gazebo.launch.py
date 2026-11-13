@@ -99,7 +99,10 @@ def generate_launch_description():
                 )
             ),
             launch_arguments={
-                "gz_args": ["empty.sdf -r --gui-config ", LaunchConfiguration("gui_config")],
+                # 必须使用带 Sensors 系统的比赛世界，否则腕部 Gemini 305
+                # 虽然随机器人模型加载，但 Gazebo 不会发布 RGB-D 话题。
+                "gz_args": [str(kit_path / "worlds" / "empty_with_sensors.sdf"),
+                            " -r --gui-config ", LaunchConfiguration("gui_config")],
             }.items(),
         ),
         TimerAction(
