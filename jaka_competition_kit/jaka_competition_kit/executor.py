@@ -245,8 +245,12 @@ class Executor:
         """
         # 夹爪按工件实际宽度收 —— 仿真里没有堵转保护, 不告诉它尺寸手指
         # 会直接穿过工件(真机靠堵转自停, 传不传都一样)
-        self.gripper.close(object_size=size if grasp_width is None else grasp_width)
-        self.wait_until_settled()
+        if not self.gripper.close(object_size=size if grasp_width is None else grasp_width):
+            self.node.get_logger().error("夹爪闭合命令失败，停止抓取")
+            return False
+        if not self.wait_until_settled():
+            self.node.get_logger().error("末端未到位，停止附着工件")
+            return False
         tcp_xyz, tcp_quat = self.tcp_pose()
         rel = _relative_pose(tcp_xyz, tcp_quat,
                              np.asarray(obj_world_xyz, float),
@@ -265,14 +269,20 @@ class Executor:
                                   touch_links=self.arena.touch_links)
         if not ok:
             self.node.get_logger().error(f"附着 {object_id} 失败")
-        self.emit("grasp", object_id=object_id)
-        return ok
+        if ok:
+            self.emit("grasp", object_id=object_id)
+        return bool(ok)
 
     def release(self, object_id: str, bin_box: Box) -> bool:
         """张开夹爪 + 把工件登记为"已入盒"(从场景中移除)。"""
-        self.gripper.open()
+        if not self.gripper.open():
+            self.node.get_logger().error("夹爪张开命令失败，停止释放")
+            return False
         ok = self.scene.release_into_bin(object_id, self.arena.tcp_link)
-        self.emit("release", object_id=object_id)
+        if ok:
+            self.emit("release", object_id=object_id)
+        else:
+            self.node.get_logger().error(f"释放 {object_id} 失败")
         return bool(ok)
 
     def go_to_bin(self, bin_box: Box, z: Optional[float] = None):
@@ -349,34 +359,42 @@ class Executor:
         if any(v is None for v in phases):
             return False
         self.last_failure = ""
-        def move(joints):
+        def move(joints, phase):
             result = self.backend.goto_joints(joints)
-            if result.ok:
-                try:
-                    self.tcp_xyz = tuple(float(v) for v in self.tcp_pose()[0])
-                except Exception:  # TF may lag a single cycle; grasp() retries no motion.
-                    pass
-            return result
-        if not move(phases[0]).ok:
-            self.last_failure = "motion"; return False
-        if not move(phases[1]).ok:
-            self.last_failure = "motion"; return False
+            if not result.ok:
+                self.last_failure = "motion"
+                self.node.get_logger().error(
+                    f"工位{station} 固定姿态阶段 {phase} 失败: {result}")
+                return False
+            try:
+                self.tcp_xyz = tuple(float(v) for v in self.tcp_pose()[0])
+            except Exception:  # TF may lag a single cycle; grasp() checks it again.
+                pass
+            return True
+        if not move(phases[0], "approach"):
+            return False
+        if not move(phases[1], "grasp"):
+            return False
         x, y = obj["xy"]
         if not self.grasp(obj["id"], object_height_for(obj),
                           (x, y, obj["z"]), dims=obj.get("dims"),
                           shape=obj.get("shape", "box"),
                           grasp_width=obj.get("grasp_width")):
-            self.last_failure = "motion"; return False
-        if not move(phases[2]).ok:
-            self.last_failure = "motion"; return False
-        if not move(phases[3]).ok:
-            self.last_failure = "motion"; return False
-        if not move(phases[4]).ok:
-            self.last_failure = "motion"; return False
+            self.last_failure = "grasp"
+            self.node.get_logger().error(f"工位{station} 夹爪闭合或附着失败")
+            return False
+        if not move(phases[2], "lift"):
+            return False
+        if not move(phases[3], "place_approach"):
+            return False
+        if not move(phases[4], "release"):
+            return False
         if not self.release(obj["id"], bin_box):
-            self.last_failure = "motion"; return False
-        if not move(phases[5]).ok:
-            self.last_failure = "motion"; return False
+            self.last_failure = "release"
+            self.node.get_logger().error(f"工位{station} 夹爪张开或释放失败")
+            return False
+        if not move(phases[5], "retreat"):
+            return False
         return True
 
 

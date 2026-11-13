@@ -32,10 +32,18 @@ class Track1Reference(ReferenceBase):
         if not text:
             self.get_logger().warn(f"二维码解码失败({png})")
             return []
-        order = parse(text)
+        try:
+            order = parse(text)
+        except ValueError as exc:
+            self.get_logger().error(f"二维码内容无效: {exc}")
+            return []
         self.get_logger().info(f"二维码内容 {text!r} -> 抓取顺序 {order}")
-        by_station = {o["station"]: o for o in self.scene["objects"]}
-        return [by_station[s] for s in order if s in by_station]
+        objects = self.scene.get("objects", [])
+        by_station = {o.get("station"): o for o in objects}
+        if len(objects) != 6 or set(by_station) != set(order):
+            self.get_logger().error("场景工位不完整或存在重复，停止执行")
+            return []
+        return [by_station[s] for s in order]
 
 
 def main(args=None):

@@ -196,9 +196,10 @@ class ReferenceBase(rclpy.node.Node):
                 self.get_logger().info(f"    固定姿态规划自检: {sum(r.ok for r in results)}/{len(results)}")
                 continue
 
-            # 赛道二允许单件重试 2 次(见 competition.md), 赛道一同样受益。
+            # 固定姿态失败时夹爪或附着状态可能未知，禁止自动重试。
+            # 其它流程保持原有重试策略。
             good = False
-            for attempt in range(3):
+            for attempt in range(1 if use_fixed else 3):
                 if use_fixed:
                     good = self.arm.fixed_pick_and_place(obj, bin_box, self.fixed_poses)
                     if good:
@@ -211,6 +212,8 @@ class ReferenceBase(rclpy.node.Node):
                         grasp_width=obj.get("grasp_width"))
                 if good:
                     break
+                if use_fixed:
+                    break
                 if self.arm.last_failure == "unreachable":
                     # 几何够不到(见 docs/WHEELTEC柔性机械爪.md 第 4 节): 重试 3 次
                     # 只是把同一段几何再算 3 遍。确定性失败就不要假装能重试成功。
@@ -221,6 +224,10 @@ class ReferenceBase(rclpy.node.Node):
             self.get_logger().info(
                 f"    {'成功' if good else '失败'} (累计 {time.time() - t0:.1f}s)")
             ok += int(good)
+            if use_fixed and not good:
+                self.get_logger().error(
+                    "固定姿态执行失败，本轮停止；请人工检查机械臂、夹爪和工件状态。")
+                break
 
         self.get_logger().info(
             f"参考实现结束: {ok}/{total}, 总耗时 {time.time() - t0:.1f}s")
