@@ -1,13 +1,13 @@
-"""赛前场地自检: 对每个抓取点做一次规划(**不执行**), 确认场地合法。
+"""赛前场地自检: 对每个抓取点做一次规划(**不执行**), 作为初步检查。
 
   ros2 launch jaka_competition_kit selfcheck.launch.py track:=1 vel_scale:=0.3
   ros2 launch jaka_competition_kit selfcheck.launch.py track:=2 vel_scale:=0.3
 
 它起的是官方参考实现并打开 `verify_only`: 所有抓取点只做 `/move_action`
-规划、不执行, 所以**真机上也敢跑**。
+规划、不执行；不验证连续轨迹、夹爪和工件状态，不构成真机运动许可。
 
 两条赛道要分开跑 —— 赛道二的自检覆盖散放区, 赛道一只覆盖 6 个工位。
-**全部 OK 才允许开赛**。
+全部 OK 也不能替代完整仿真与现场安全验收。
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument

@@ -80,3 +80,24 @@ def test_release_does_not_score_when_open_or_scene_release_fails():
     arm.gripper.open = lambda: True
     assert not Executor.release(arm, 'wp_1', None)
     assert len(releases) == 1 and not emitted
+
+
+def test_fixed_selfcheck_warns_that_plans_are_independent(monkeypatch):
+    monkeypatch.setattr(reference, 'is_complete', lambda *a, **kw: True)
+    logger = Logger()
+    obj = {'station': 1, 'xy': [0.1, 0.2]}
+    pose = [0.0] * 6
+    config = {'objects': {'1': {p + '_joints': pose for p in ('approach', 'grasp', 'lift')}},
+              'place': {p + '_joints': pose for p in ('approach', 'release', 'retreat')}}
+    calls = []
+    node = SimpleNamespace(get_logger=lambda: logger, wait_for_scene=lambda: True,
+                           get_parameter=lambda _: SimpleNamespace(value=True),
+                           plan_order=lambda: [obj], scene={'track': 1}, fixed_poses=config,
+                           fixed_poses_backend='simulation', fixed_poses_device_profile='sim',
+                           arena=SimpleNamespace(track1_bin=object()),
+                           backend=SimpleNamespace(goto_joints=lambda j, plan_only: calls.append(plan_only) or SimpleNamespace(ok=True)),
+                           done=False)
+    reference.ReferenceBase.run(node)
+    assert calls == [True] * 6
+    assert any('不验证点间连续轨迹' in msg for _, msg in logger.messages)
+    assert any('非连续流程验收' in msg for _, msg in logger.messages)

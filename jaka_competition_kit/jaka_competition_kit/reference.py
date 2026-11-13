@@ -146,6 +146,9 @@ class ReferenceBase(rclpy.node.Node):
             # 自检只做规划、不执行, 也没必要等裁判发令 —— 否则"赛前场地自检"
             # 会一直卡在等 /competition/start 上。真机自检尤其需要它马上出结果。
             self.get_logger().info("自检模式: 不等发令, 直接逐点规划(不执行)")
+            self.get_logger().warning(
+                "逐点规划均从当前机器人状态出发，不验证点间连续轨迹、夹爪动作或工件附着；"
+                "通过不代表完整流程可执行，也不构成真机运行许可。")
         else:
             self.get_logger().info("题目已就绪, 等待裁判发令 (/competition/start) ...")
             if not self.wait_for_state("running"):
@@ -193,7 +196,7 @@ class ReferenceBase(rclpy.node.Node):
                            ("approach_joints", "release_joints", "retreat_joints")]
                 results = [self.backend.goto_joints(j, plan_only=True) for j in phases]
                 ok += int(all(r.ok for r in results))
-                self.get_logger().info(f"    固定姿态规划自检: {sum(r.ok for r in results)}/{len(results)}")
+                self.get_logger().info(f"    固定姿态独立目标规划自检: {sum(r.ok for r in results)}/{len(results)}（非连续流程验收）")
                 continue
 
             # 固定姿态失败时夹爪或附着状态可能未知，禁止自动重试。
