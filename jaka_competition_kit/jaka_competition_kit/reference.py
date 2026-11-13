@@ -58,6 +58,9 @@ class ReferenceBase(rclpy.node.Node):
         self.declare_parameter("io_settle", 0.5)
         self.declare_parameter("debug_timing", False)
         self.declare_parameter("fixed_poses_config", default_fixed_pose_path())
+        self.declare_parameter("fixed_poses_backend", "simulation")
+        self.declare_parameter("fixed_poses_device_profile", "jaka_mini_2_gemini305_gripper_sim")
+        self.declare_parameter("allow_cartesian_fallback", True)
 
         self.arena = load_arena(str(self.get_parameter("arena_config").value) or None)
         pose_path = str(self.get_parameter("fixed_poses_config").value) or default_fixed_pose_path()
@@ -66,6 +69,9 @@ class ReferenceBase(rclpy.node.Node):
         except (OSError, ValueError) as exc:
             self.get_logger().warning(f"固定姿态配置不可用，将使用基础笛卡尔流程：{exc}")
             self.fixed_poses = {}
+        self.fixed_poses_backend = str(self.get_parameter("fixed_poses_backend").value)
+        self.fixed_poses_device_profile = str(
+            self.get_parameter("fixed_poses_device_profile").value)
         self.scene: Dict = {}
         self.run_state = "idle"
 
@@ -154,6 +160,19 @@ class ReferenceBase(rclpy.node.Node):
         t0 = time.time()
         ok = 0
         total = len(objects)
+        fixed_ready = is_complete(
+            self.fixed_poses, backend=self.fixed_poses_backend,
+            device_profile=self.fixed_poses_device_profile)
+        if self.scene.get("track") == 1 and not fixed_ready:
+            allow_fallback = bool(self.get_parameter("allow_cartesian_fallback").value)
+            if not allow_fallback:
+                self.get_logger().error(
+                    "固定姿态配置未完成或 profile 不匹配，且 allow_cartesian_fallback=false；"
+                    "为避免意外执行其它策略，本轮停止。")
+                return
+            self.get_logger().warning(
+                "固定姿态配置未完成或 profile 不匹配；按显式参数 "
+                "allow_cartesian_fallback=true 回退到笛卡尔基础流程。")
         for k, obj in enumerate(objects, 1):
             if self.scene.get("track") == 1:
                 bin_box = self.arena.track1_bin
@@ -165,7 +184,7 @@ class ReferenceBase(rclpy.node.Node):
             self.get_logger().info(
                 f"[{k}/{total}] {tag}{obj.get('label','')} "
                 f"x={x*1000:.0f} y={y*1000:.0f} r={r*1000:.0f}mm")
-            use_fixed = (self.scene.get("track") == 1 and is_complete(self.fixed_poses)
+            use_fixed = (self.scene.get("track") == 1 and fixed_ready
                          and bool(obj.get("station")))
             if use_fixed and verify_only:
                 phases = [self.fixed_poses["objects"][str(obj["station"])][p]

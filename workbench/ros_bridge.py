@@ -340,7 +340,8 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
             }
             checks = readiness(mode, facts, camera_required=camera_enabled)
             emit({"type": "status", "ready": all(c["level"] == "ok" for c in checks),
-                  "checks": checks, "joint_positions":
+                  "checks": checks, "joint_age_s": (now - current["joint_at"]
+                  if current["joint_at"] else None), "joint_positions":
                   {name: current["joint_positions"].get(name) for name in sorted(ARM_JOINTS)
                    if name in current["joint_positions"]},
                   "recognition": (current["detections"] if detection_fresh else None)
@@ -357,18 +358,25 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
 
 
 
-def move_joints(values: list[float], velocity: float = 0.25) -> int:
-    """工作台受控的单次关节姿态运动，仅连接当前已 source 的仿真/ROS 会话。"""
+def move_joints(values: list[float], velocity: float = 0.25,
+                backend: str = "simulation") -> int:
+    """工作台受控的单次关节姿态运动。
+
+    工作台协议只允许显式的仿真 profile；真机动作必须由独立部署流程负责，
+    不能因为后台检测到真实 ROS 话题就被工作台误触发。
+    """
     import rclpy
     from jaka_competition_kit.backend import MoveGroupBackend
+    from jaka_competition_kit.fixed_poses import validate_joints
     rclpy.init()
     node = rclpy.create_node("workbench_pose_move")
     try:
-        if len(values) != 6 or any(not math.isfinite(float(v)) for v in values):
-            raise ValueError("必须提供 6 个有限关节角")
-        backend = MoveGroupBackend(node, vel_scale=float(velocity), acc_scale=float(velocity),
+        if backend != "simulation":
+            raise ValueError("工作台姿态移动只允许 simulation backend；真机需使用独立安全流程")
+        values = validate_joints(values)
+        backend_impl = MoveGroupBackend(node, vel_scale=float(velocity), acc_scale=float(velocity),
                                    planning_attempts=2, allowed_planning_time=2.0)
-        result = backend.goto_joints([float(v) for v in values])
+        result = backend_impl.goto_joints(values)
         emit({"type": "pose-move", "success": bool(result.ok), "detail": str(result)})
         return 0 if result.ok else 2
     except Exception as exc:
@@ -430,6 +438,7 @@ def main(argv=None):
     pose = sub.add_parser("move-joints")
     pose.add_argument("--joints", nargs=6, type=float, required=True)
     pose.add_argument("--velocity", type=float, default=0.25)
+    pose.add_argument("--backend", choices=("simulation",), default="simulation")
     args = parser.parse_args(argv)
     try:
         if args.command == "monitor":
@@ -437,7 +446,7 @@ def main(argv=None):
         if args.command == "service":
             return halt(args.timeout) if args.name == "halt" else service(args.name, args.timeout)
         if args.command == "move-joints":
-            return move_joints(args.joints, args.velocity)
+            return move_joints(args.joints, args.velocity, args.backend)
         return reference(args.velocity, args.fixed_poses)
     except Exception as exc:
         emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})

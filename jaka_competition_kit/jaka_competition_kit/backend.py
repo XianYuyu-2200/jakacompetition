@@ -539,6 +539,15 @@ class MoveGroupBackend:
             return MoveResult(False, -7, 0.0, via="joint-invalid")
         if any(not math.isfinite(v) for v in vals):
             return MoveResult(False, -7, 0.0, via="joint-invalid")
+        # The model limits arrive on /robot_description. Once available, reject
+        # out-of-range saved targets before constructing or sending a MoveIt goal.
+        for name, value in zip(self.joint_names, vals):
+            limits = self._limits.get(name)
+            if limits and not (limits[0] <= value <= limits[1]):
+                self.node.get_logger().error(
+                    f"拒绝关节姿态：{name}={value:.6f} 超出机器人模型限位 "
+                    f"[{limits[0]:.6f}, {limits[1]:.6f}]")
+                return MoveResult(False, -7, 0.0, via="joint-limit")
         cur = self.joint_state(timeout=0.5) or vals
         move = max(abs(a - b) for a, b in zip(vals, cur))
         t0 = time.time()

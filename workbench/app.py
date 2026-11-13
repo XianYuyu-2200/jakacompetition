@@ -198,8 +198,10 @@ class WorkbenchWindow(QMainWindow):
     def __init__(self, root: Path, data_dir: Path, demo=False, mode="basic"):
         super().__init__()
         self.root, self.data_dir, self.demo = Path(root), Path(data_dir), bool(demo)
-        for name in ("logs", "results", "programs"):
+        self._pose_init_error = ""
+        for name in ("logs", "results", "programs", "config"):
             (self.data_dir / name).mkdir(parents=True, exist_ok=True)
+        self._ensure_pose_config()
         self.manager = ProcessManager(self.data_dir / "logs")
         self.settings = QSettings(str(self.data_dir / "preferences.ini"), QSettings.IniFormat)
         self.ready = False
@@ -236,6 +238,8 @@ class WorkbenchWindow(QMainWindow):
         self.resize(round(1240 * self.ui_scale), round(860 * self.ui_scale))
         self.setMinimumSize(round(960 * self.ui_scale), round(680 * self.ui_scale))
         self._build_ui()
+        if self._pose_init_error:
+            self._log(self._pose_init_error)
         self.mode_combo.setCurrentIndex(max(0, self.mode_combo.findData(mode)))
         self._style()
         self._refresh_results()
@@ -442,7 +446,7 @@ class WorkbenchWindow(QMainWindow):
         self.pose_status = _label("等待仿真关节状态。", "muted")
         pose_buttons.addWidget(self.pose_status, 1)
         pose_layout.addLayout(pose_buttons)
-        self.pose_file_label = _label("配置：track1_fixed_poses.yaml", "muted")
+        self.pose_file_label = _label(f"配置：{self._pose_path()}", "muted")
         pose_layout.addWidget(self.pose_file_label)
         layout.addWidget(pose_card)
         middle = QHBoxLayout()
@@ -950,6 +954,9 @@ class WorkbenchWindow(QMainWindow):
             self.run_state = payload.get("run_state", "idle")
             self.scene = payload.get("scene") or {}
             self.joint_positions = payload.get("joint_positions") or self.joint_positions
+            joint_age = payload.get("joint_age_s")
+            if joint_age is not None and joint_age > 4.0:
+                self.pose_status.setText(f"关节状态已过期（{joint_age:.1f}s），暂不建议记录姿态。")
             new_score = payload.get("score")
             if new_score and new_score != self.score:
                 self._log(f"本轮结束，完成 {new_score.get('collected_count', 0)}/6；成绩仅用于学习反馈。")
@@ -1166,16 +1173,46 @@ class WorkbenchWindow(QMainWindow):
     def _pose_phase_changed(self):
         self._load_saved_pose_into_editor()
 
-    def _pose_path(self) -> Path:
+    def _pose_template_path(self) -> Path:
         return self.root / "jaka_competition_kit" / "config" / "track1_fixed_poses.yaml"
+
+    def _pose_path(self) -> Path:
+        # Participant calibration belongs to the workbench data directory, not
+        # the source checkout. This keeps the official template reproducible and
+        # allows each team/profile to maintain its own persisted poses.
+        return self.data_dir / "config" / "track1_fixed_poses.yaml"
+
+    def _ensure_pose_config(self):
+        destination = self._pose_path()
+        if destination.exists():
+            return
+        template = self._pose_template_path()
+        try:
+            if template.exists():
+                shutil.copyfile(template, destination)
+            else:
+                destination.write_text(
+                    "version: 2\nenabled: false\nbackend: simulation\n"
+                    "device_profile: jaka_mini_2_gemini305_gripper_sim\nobjects: {}\nplace: {}\n",
+                    encoding="utf-8")
+        except OSError as exc:
+            # The editor will surface a precise error when a record is attempted.
+            self._pose_init_error = f"固定姿态模板初始化失败：{exc}"
 
     def _pose_key(self):
         kind, phase = str(self.pose_phase.currentData()).split(":", 1)
         return kind, phase
 
+    def _fixed_pose_api(self):
+        package_root = str(self.root / "jaka_competition_kit")
+        if package_root not in sys.path:
+            sys.path.insert(0, package_root)
+        from jaka_competition_kit import fixed_poses
+        return fixed_poses
+
     def _load_saved_pose_into_editor(self):
         try:
-            data = yaml.safe_load(self._pose_path().read_text(encoding="utf-8")) or {}
+            data = self._fixed_pose_api().load_fixed_poses(str(self._pose_path()))
             kind, phase = self._pose_key()
             target = (data.get("objects", {}).get(str(self.pose_station.value()), {})
                       if kind == "object" else data.get("place", {}))
@@ -1184,8 +1221,8 @@ class WorkbenchWindow(QMainWindow):
                 for spin, value in zip(self.joint_spins, values):
                     spin.blockSignals(True); spin.setValue(float(value)); spin.blockSignals(False)
                 self.pose_status.setText("已载入已保存姿态。")
-        except (OSError, ValueError, yaml.YAMLError):
-            pass
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            self.pose_status.setText(f"姿态配置读取失败：{exc}")
 
     def _read_current_joints(self):
         values = [self.joint_positions.get(f"joint_{i}") for i in range(1, 7)]
@@ -1206,7 +1243,8 @@ class WorkbenchWindow(QMainWindow):
             return
         try:
             self.manager.launch("pose", self._bridge("move-joints", "--joints", *[str(v) for v in values],
-                                                     "--velocity", str(self.velocity_spin.value())),
+                                                     "--velocity", str(self.velocity_spin.value()),
+                                                     "--backend", "simulation"),
                                 self.root, self._env())
             self.pose_status.setText("正在移动到输入姿态……")
         except Exception as exc:
@@ -1216,26 +1254,15 @@ class WorkbenchWindow(QMainWindow):
         values = [spin.value() for spin in self.joint_spins]
         path = self._pose_path()
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
-            data = data or {"version": 1, "enabled": False, "objects": {}, "place": {}}
             kind, phase = self._pose_key()
-            target = data.setdefault("objects", {}).setdefault(str(self.pose_station.value()), {}) \
-                     if kind == "object" else data.setdefault("place", {})
-            target[f"{phase}_joints"] = [float(v) for v in values]
-            complete = True
-            for station in range(1, 7):
-                obj = data.get("objects", {}).get(str(station), {})
-                complete = complete and all(isinstance(obj.get(f"{p}_joints"), list) and len(obj[f"{p}_joints"]) == 6
-                                            for p in ("approach", "grasp", "lift"))
-            place = data.get("place", {})
-            complete = complete and all(isinstance(place.get(f"{p}_joints"), list) and len(place[f"{p}_joints"]) == 6
-                                        for p in ("approach", "release", "retreat"))
-            data["enabled"] = bool(complete)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
-            tmp.replace(path)
-            self.pose_status.setText("已记录；" + ("官方基础模型将使用固定姿态。" if complete else "请继续记录其它阶段。"))
+            api = self._fixed_pose_api()
+            data = api.update_pose(
+                str(path), station=self.pose_station.value() if kind == "object" else None,
+                phase=phase, joints=values, backend="simulation",
+                device_profile="jaka_mini_2_gemini305_gripper_sim")
+            complete = api.is_complete(data)
+            self.pose_status.setText("已记录；" + ("官方基础模型将使用固定姿态。"
+                                                    if complete else "请继续记录其它阶段。"))
             self._log(f"已记录固定姿态：{kind} {phase} -> {path}")
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self.pose_status.setText(f"保存失败：{exc}")

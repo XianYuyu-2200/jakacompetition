@@ -58,6 +58,23 @@ class AppTests(unittest.TestCase):
         self.assertFalse(self.window.generate_button.isEnabled())
         self.assertTrue(self.window.mode_combo.isEnabled())
 
+    def test_pose_record_uses_private_versioned_simulation_config(self):
+        for index, spin in enumerate(self.window.joint_spins):
+            spin.setValue(index * 0.1)
+        self.window._record_pose()
+        pose_path = Path(self.directory.name) / "config" / "track1_fixed_poses.yaml"
+        self.assertTrue(pose_path.exists())
+        import yaml
+        data = yaml.safe_load(pose_path.read_text(encoding="utf-8"))
+        self.assertEqual(data["version"], 2)
+        self.assertEqual(data["backend"], "simulation")
+        self.assertEqual(data["device_profile"], "jaka_mini_2_gemini305_gripper_sim")
+        self.assertFalse(data["enabled"])
+        self.assertEqual(len(data["objects"]["1"]["approach_joints"]), 6)
+        # Calibration stays in the team's data folder and does not mutate the
+        # checked-in starter template.
+        self.assertEqual(yaml.safe_load(self.window._pose_template_path().read_text())["objects"], {})
+
     def test_demo_records_are_explicitly_labelled(self):
         self.window.start_environment()
         self.window.generate()

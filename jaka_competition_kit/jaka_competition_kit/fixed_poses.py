@@ -1,20 +1,19 @@
-"""赛道一固定关节姿态配置。
-
-配置是仿真和真机都能使用的纯 YAML 数据：仿真调出的姿态可以直接复制到真机
-配置，再按真机零位、夹爪安装和安全距离重新校准。程序永远不会把二维码真值
-``qr_order`` 当成输入；固定姿态只负责把编号映射到已经记录好的动作。
-"""
+"""赛道一固定关节姿态配置的加载、校验和原子更新。"""
 from __future__ import annotations
 
 import math
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+import tempfile
+from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
 import yaml
 
+SCHEMA_VERSION = 2
 JOINT_NAMES = [f"joint_{i}" for i in range(1, 7)]
 PHASES = ("approach", "grasp", "lift", "release", "retreat")
+OBJECT_PHASES = ("approach", "grasp", "lift")
+PLACE_PHASES = ("approach", "release", "retreat")
 
 
 def default_fixed_pose_path() -> str:
@@ -22,79 +21,186 @@ def default_fixed_pose_path() -> str:
                         "config", "track1_fixed_poses.yaml")
 
 
-def validate_joints(values: Iterable[float]) -> list[float]:
+def validate_joints(values: Iterable[float], *,
+                    joint_limits: Optional[Mapping[str, Sequence[float]]] = None) -> list[float]:
     values = list(values)
     if len(values) != 6:
         raise ValueError(f"固定姿态必须有 6 个关节角，收到 {len(values)} 个")
     out = []
     for i, value in enumerate(values, 1):
-        value = float(value)
-        if not math.isfinite(value) or abs(value) > 2.0 * math.pi + 1e-6:
-            raise ValueError(f"joint_{i} 角度超出 [-2π, 2π]：{value}")
+        try:
+            value = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"joint_{i} 不是有效数值：{value!r}") from exc
+        if not math.isfinite(value):
+            raise ValueError(f"joint_{i} 必须是有限数值：{value}")
+        if joint_limits and f"joint_{i}" in joint_limits:
+            lower, upper = map(float, joint_limits[f"joint_{i}"])
+            if not (math.isfinite(lower) and math.isfinite(upper) and lower <= upper):
+                raise ValueError(f"joint_{i} 的机器人模型限位无效：[{lower}, {upper}]")
+            if value < lower or value > upper:
+                raise ValueError(f"joint_{i}={value} 超出机器人模型限位 [{lower}, {upper}]")
+        elif abs(value) > 2.0 * math.pi + 1e-6:
+            # 仅在机器人模型尚不可用时作宽松防错；运动前仍由 MoveIt 再校验。
+            raise ValueError(f"joint_{i} 角度超出默认安全范围 [-2π, 2π]：{value}")
         out.append(value)
     return out
+
+
+def _validate_document(raw: Any, *, allow_legacy: bool = True) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("固定姿态文件必须是 YAML 对象")
+    version = raw.get("version", 1)
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise ValueError("固定姿态 version 必须是整数")
+    if version not in (1, SCHEMA_VERSION) or (version == 1 and not allow_legacy):
+        raise ValueError(f"不支持固定姿态配置版本：{version}")
+    if version == 1:
+        # 旧格式只兼容读取，不假定其校准来源；落盘时升级为 v2。
+        raw = dict(raw)
+        raw.update(version=SCHEMA_VERSION, enabled=False, backend="simulation",
+                   device_profile="jaka_mini_2_gemini305_gripper_sim",
+                   joint_names=JOINT_NAMES.copy(), angle_unit="rad",
+                   calibration={"source": "legacy-v1", "verified": False,
+                                 "requires_recalibration": True})
+    if raw.get("backend") not in ("simulation", "hardware"):
+        raise ValueError("固定姿态 backend 必须是 simulation 或 hardware")
+    if not isinstance(raw.get("device_profile"), str) or not raw["device_profile"].strip():
+        raise ValueError("固定姿态必须指定非空 device_profile")
+    if raw.get("joint_names") != JOINT_NAMES:
+        raise ValueError(f"joint_names 必须严格为 {JOINT_NAMES}")
+    if raw.get("angle_unit") != "rad":
+        raise ValueError("关节角单位必须为 rad")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise ValueError("enabled 必须是布尔值")
+    objects, place = raw.get("objects", {}), raw.get("place", {})
+    if not isinstance(objects, dict) or not isinstance(place, dict):
+        raise ValueError("固定姿态的 objects/place 必须是对象")
+    unknown = set(objects) - {str(i) for i in range(1, 7)}
+    if unknown:
+        raise ValueError(f"存在未知工位编号：{', '.join(sorted(map(str, unknown)))}")
+    for station, entry in objects.items():
+        if not isinstance(entry, dict):
+            raise ValueError(f"工位 {station} 的姿态必须是对象")
+        for phase in OBJECT_PHASES:
+            value = entry.get(f"{phase}_joints", entry.get(phase))
+            if value is not None:
+                validate_joints(value)
+    for phase in PLACE_PHASES:
+        value = place.get(f"{phase}_joints", place.get(phase))
+        if value is not None:
+            validate_joints(value)
+    calibration = raw.get("calibration", {})
+    if not isinstance(calibration, dict):
+        raise ValueError("calibration 必须是对象")
+    result = dict(raw)
+    result["objects"], result["place"] = objects, place
+    result.setdefault("enabled", False)
+    result.setdefault("calibration", {"source": "unknown", "verified": False})
+    return result
 
 
 def load_fixed_poses(path: Optional[str] = None) -> Dict[str, Any]:
     path = path or default_fixed_pose_path()
     try:
         with open(path, "r", encoding="utf-8") as stream:
-            raw = yaml.safe_load(stream) or {}
+            raw = yaml.safe_load(stream)
     except FileNotFoundError:
-        return {"version": 1, "enabled": False, "objects": {}, "place": {}}
-    if not isinstance(raw, dict):
-        raise ValueError(f"固定姿态文件必须是 YAML 对象：{path}")
-    raw.setdefault("version", 1)
-    raw.setdefault("enabled", False)
-    raw.setdefault("objects", {})
-    raw.setdefault("place", {})
-    if not isinstance(raw["objects"], dict) or not isinstance(raw["place"], dict):
-        raise ValueError("固定姿态的 objects/place 必须是对象")
-    return raw
+        return new_fixed_pose_document()
+    except yaml.YAMLError as exc:
+        raise ValueError(f"固定姿态 YAML 格式错误：{exc}") from exc
+    if raw is None:
+        return new_fixed_pose_document()
+    return _validate_document(raw)
 
 
-def pose_for(data: Dict[str, Any], station: int, phase: str) -> Optional[list[float]]:
+def new_fixed_pose_document(backend: str = "simulation",
+                           device_profile: str = "jaka_mini_2_gemini305_gripper_sim") -> Dict[str, Any]:
+    if backend not in ("simulation", "hardware"):
+        raise ValueError("backend 必须是 simulation 或 hardware")
+    return {"version": SCHEMA_VERSION, "enabled": False, "backend": backend,
+            "device_profile": device_profile, "joint_names": JOINT_NAMES.copy(),
+            "angle_unit": "rad", "calibration": {"source": "workbench", "verified": False},
+            "objects": {}, "place": {}}
+
+
+def pose_for(data: Dict[str, Any], station: int, phase: str,
+             *, joint_limits=None) -> Optional[list[float]]:
+    if phase not in OBJECT_PHASES:
+        raise ValueError(f"工位姿态阶段无效：{phase}")
     entry = data.get("objects", {}).get(str(int(station)), {})
     if not isinstance(entry, dict):
         return None
-    value = entry.get(f"{phase}_joints")
-    if value is None:
-        value = entry.get(phase)
-    if value is None:
-        return None
-    return validate_joints(value)
+    value = entry.get(f"{phase}_joints", entry.get(phase))
+    return None if value is None else validate_joints(value, joint_limits=joint_limits)
 
 
-def place_pose_for(data: Dict[str, Any], phase: str) -> Optional[list[float]]:
-    value = data.get("place", {}).get(f"{phase}_joints")
-    if value is None:
-        value = data.get("place", {}).get(phase)
-    return None if value is None else validate_joints(value)
+def place_pose_for(data: Dict[str, Any], phase: str,
+                   *, joint_limits=None) -> Optional[list[float]]:
+    if phase not in PLACE_PHASES:
+        raise ValueError(f"放置姿态阶段无效：{phase}")
+    value = data.get("place", {}).get(f"{phase}_joints", data.get("place", {}).get(phase))
+    return None if value is None else validate_joints(value, joint_limits=joint_limits)
 
 
-def is_complete(data: Dict[str, Any], stations=range(1, 7)) -> bool:
+def profile_matches(data: Dict[str, Any], *, backend: str, device_profile: str) -> bool:
+    """Require the caller to opt into the exact calibrated device profile."""
+    return data.get("backend") == backend and data.get("device_profile") == device_profile
+
+
+def is_complete(data: Dict[str, Any], stations=range(1, 7), *,
+                backend: Optional[str] = None,
+                device_profile: Optional[str] = None) -> bool:
     if not bool(data.get("enabled", False)):
         return False
+    if backend is not None and data.get("backend") != backend:
+        return False
+    if device_profile is not None and data.get("device_profile") != device_profile:
+        return False
     for station in stations:
-        if any(pose_for(data, station, phase) is None for phase in ("approach", "grasp", "lift")):
+        if any(pose_for(data, station, phase) is None for phase in OBJECT_PHASES):
             return False
-    return all(place_pose_for(data, phase) is not None for phase in ("approach", "release", "retreat"))
+    return all(place_pose_for(data, phase) is not None for phase in PLACE_PHASES)
 
 
 def update_pose(path: str, *, station: Optional[int], phase: str,
-                joints: Iterable[float], gripper: Optional[float] = None) -> Dict[str, Any]:
+                joints: Iterable[float], gripper: Optional[float] = None,
+                backend: str = "simulation", device_profile: str = "jaka_mini_2_gemini305_gripper_sim") -> Dict[str, Any]:
     if phase not in PHASES:
         raise ValueError(f"未知姿态阶段：{phase}")
-    data = load_fixed_poses(path)
+    if station is not None and int(station) not in range(1, 7):
+        raise ValueError(f"工位编号必须为 1..6：{station}")
     values = validate_joints(joints)
-    target = data.setdefault("objects", {}).setdefault(str(int(station)), {}) if station else data.setdefault("place", {})
+    data = load_fixed_poses(path) if Path(path).exists() else new_fixed_pose_document(backend, device_profile)
+    if data.get("calibration", {}).get("requires_recalibration"):
+        # Do not silently bless poses whose original robot/profile provenance is
+        # unknown. The first save starts a clean calibration set.
+        data["objects"], data["place"] = {}, {}
+        data["calibration"] = {"source": "workbench", "verified": False}
+    if data["backend"] != backend or data["device_profile"] != device_profile:
+        raise ValueError("不能将不同 backend/device_profile 的姿态混写；请使用独立配置文件")
+    target = data["objects"].setdefault(str(int(station)), {}) if station is not None else data["place"]
     target[f"{phase}_joints"] = values
     if gripper is not None:
-        target[f"{phase}_gripper"] = float(gripper)
-    # 只有 6 个工位和放置动作均记录后才自动切换为固定姿态模式。
-    data["enabled"] = is_complete(data)
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    tmp = Path(path).with_suffix(Path(path).suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
-    tmp.replace(path)
+        gripper = float(gripper)
+        if not math.isfinite(gripper):
+            raise ValueError("夹爪参数必须是有限数值")
+        target[f"{phase}_gripper"] = gripper
+    data["enabled"] = is_complete({**data, "enabled": True})
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",
+                                    dir=str(destination.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            yaml.safe_dump(data, stream, allow_unicode=True, sort_keys=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp_name, destination)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     return data
