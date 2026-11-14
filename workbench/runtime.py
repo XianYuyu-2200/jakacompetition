@@ -366,7 +366,7 @@ class ProcessManager:
             job.reader_done.set()
 
     def launch(self, name: str, argv: Sequence[str], cwd: Path,
-               env: Mapping[str, str] | None = None) -> int:
+               env: Mapping[str, str] | None = None, *, input_pipe: bool = False) -> int:
         if not name or not isinstance(name, str):
             raise ValueError('任务名必须是非空字符串')
         if not argv or isinstance(argv, (str, bytes)):
@@ -399,7 +399,7 @@ class ProcessManager:
             try:
                 process = subprocess.Popen(
                     list(argv), cwd=os.fspath(cwd), env=child_env,
-                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                    stdin=subprocess.PIPE if input_pipe else subprocess.DEVNULL, stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT, text=True, encoding='utf-8',
                     errors='replace', bufsize=1, start_new_session=True,
                 )
@@ -417,6 +417,28 @@ class ProcessManager:
             job.reader.start()
             self._track(job, _process_snapshot())
             return process.pid
+
+    def write_input(self, name: str, data: bytes) -> bool:
+        """Nonblocking heartbeat to an owned child. A full/broken pipe fails closed."""
+        with self._lock:
+            job = self._jobs.get(name)
+            if not job or job.exited or job.process.poll() is not None or not job.process.stdin:
+                return False
+            try:
+                fd = job.process.stdin.fileno()
+                os.set_blocking(fd, False)
+                return os.write(fd, data) == len(data)
+            except (OSError, ValueError):
+                return False
+
+    def close_input(self, name: str) -> None:
+        with self._lock:
+            job = self._jobs.get(name)
+            if job and job.process.stdin:
+                try:
+                    job.process.stdin.close()
+                except (OSError, ValueError):
+                    pass
 
     def alive(self, name: str) -> bool:
         with self._lock:

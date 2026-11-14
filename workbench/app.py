@@ -5,6 +5,7 @@ from datetime import datetime
 import base64
 import binascii
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -15,22 +16,27 @@ import time
 
 import yaml
 
-from PyQt5.QtCore import (QObject, QRunnable, QSettings, Qt, QThreadPool, QTimer,
+from PyQt5.QtCore import (QEvent, QObject, QRunnable, QSettings, Qt, QThreadPool, QTimer,
                           QUrl, pyqtSignal)
 from PyQt5.QtGui import QColor, QDesktopServices, QFont, QImage, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QSpinBox, QSplitter, QStackedWidget,
+    QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
+    QStackedWidget, QTabWidget,
     QTableWidget, QTableWidgetItem, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 from . import __version__
+from .theme import stylesheet
 from .ros_bridge import PREFIX
 from .runtime import ProcessManager, check_environment, ros_command, simulation_conflicts
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 STATE_NAMES = {"idle": "待出题", "armed": "题目就绪", "running": "本轮运行中", "finished": "本轮结束"}
+# ros_bridge monitor reports joint feedback once per second and considers it
+# valid for <4 s. Keep this UI deadman freshness limit aligned with that source.
+JOINT_FEEDBACK_MAX_AGE = 4.0
 
 
 def _display_scale() -> float:
@@ -164,7 +170,8 @@ class _CheckTask(QRunnable):
 def _button(text, handler, primary=False, danger=False):
     button = QPushButton(text)
     button.setCursor(Qt.PointingHandCursor)
-    button.setMinimumHeight(round(36 * _display_scale()))
+    button.setMinimumHeight(round(44 * _display_scale()))
+    button.setAccessibleName(text)
     if primary:
         button.setProperty("role", "primary")
     if danger:
@@ -209,6 +216,11 @@ class WorkbenchWindow(QMainWindow):
         self.scene = {}
         self.score = None
         self.joint_positions = {}
+        self.joint_sample_at = 0.0
+        self._pose_inflight = False
+        self._jog_held = None
+        self._jog_result_received = False
+        self._jog_fault = False
         self.last_status = 0.0
         self.stack_started = 0.0
         self._checking = False
@@ -235,8 +247,11 @@ class WorkbenchWindow(QMainWindow):
         self._demo_epoch = 0
         self.setWindowTitle("基础组学习工作台 · JAKA Mini 2")
         self.ui_scale = _display_scale()
-        self.resize(round(1240 * self.ui_scale), round(860 * self.ui_scale))
-        self.setMinimumSize(round(960 * self.ui_scale), round(680 * self.ui_scale))
+        screen = QApplication.primaryScreen()
+        available = screen.availableGeometry() if screen else None
+        self.setMinimumSize(960, 620)
+        self.resize(min(round(1440 * self.ui_scale), available.width() if available else 1440),
+                    min(round(920 * self.ui_scale), available.height() if available else 920))
         self._build_ui()
         if self._pose_init_error:
             self._log(self._pose_init_error)
@@ -263,58 +278,60 @@ class WorkbenchWindow(QMainWindow):
         row = QHBoxLayout(outer)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(0)
-        sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(round(210 * self.ui_scale))
-        side = QVBoxLayout(sidebar)
-        side.setContentsMargins(round(20 * self.ui_scale), round(30 * self.ui_scale),
-                                round(20 * self.ui_scale), round(22 * self.ui_scale))
-        side.setSpacing(round(10 * self.ui_scale))
+        self.sidebar = QFrame()
+        self.sidebar.setObjectName("sidebar")
+        self.sidebar.setFixedWidth(round(176 * self.ui_scale))
+        side = QVBoxLayout(self.sidebar)
+        side.setContentsMargins(16, 24, 16, 20)
+        side.setSpacing(10)
         side.addWidget(_label("JAKA / LEARN", "brand"))
-        side.addWidget(_label("基础组\n仿真学习工作台", "sideTitle"))
-        side.addSpacing(round(28 * self.ui_scale))
+        self.sidebar_title = _label("机器人学习\n工作台", "sideTitle")
+        side.addWidget(self.sidebar_title)
+        side.addWidget(_label("Mini 2 · 基础组", "sideMuted"))
+        side.addSpacing(22)
         self.nav_buttons = []
-        for index, title in enumerate(("01  练习控制台", "02  我的程序", "03  运行记录", "04  入门与说明")):
+        for index, title in enumerate(("01   练习控制台", "02   我的程序", "03   运行记录", "04   入门指南")):
             button = _button(title, lambda checked=False, i=index: self._navigate(i))
             button.setCheckable(True)
             button.setObjectName("nav")
             self.nav_buttons.append(button)
             side.addWidget(button)
         side.addStretch()
-        side.addWidget(_label("本地 Ubuntu 原型\nCPU 优先 · 无云端依赖", "sideMuted"))
+        side.addWidget(_label("SIMULATION ONLY", "sideMuted"))
+        side.addWidget(_label("仿真学习 · 不连接真机", "sideMuted"))
         side.addWidget(_label(f"v{__version__}  /  {'DEMO' if self.demo else 'LOCAL'}", "sideMuted"))
-        row.addWidget(sidebar)
+        row.addWidget(self.sidebar)
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(round(26 * self.ui_scale), round(20 * self.ui_scale),
-                                  round(26 * self.ui_scale), round(18 * self.ui_scale))
-        layout.setSpacing(round(12 * self.ui_scale))
+        layout.setContentsMargins(24, 20, 24, 14)
+        layout.setSpacing(12)
         heading = QHBoxLayout()
         title_col = QVBoxLayout()
-        title_col.addWidget(_label("从第一轮抓取开始", "title"))
-        title_col.addWidget(_label("出题、运行、观察、修改程序，在一个入口完成。", "muted"))
+        title_col.setSpacing(4)
+        self.page_title = _label("练习控制台", "title")
+        self.page_subtitle = _label("先运行基础模型，再调好每一个姿态。", "muted")
+        title_col.addWidget(self.page_title)
+        title_col.addWidget(self.page_subtitle)
         heading.addLayout(title_col, 1)
-        heading.addStretch()
         self.status_badge = _label("演示模式" if self.demo else "尚未启动", "badge")
         self.status_badge.setWordWrap(False)
-        self.status_badge.setMinimumWidth(round(120 * self.ui_scale))
         heading.addWidget(self.status_badge)
         layout.addLayout(heading)
-        self.notice = _label("演示模式：不启动 ROS；动画与成绩不是实际仿真结果。" if self.demo else
-                             "基础组Gazebo 原生窗口与腕部相机均内置工作台；识别和视觉模式使用专用 Gazebo 场景。各模式不可同时运行。", "notice")
+        self.notice = _label("演示模式：不启动 ROS；画面、动画与成绩均非实际仿真。" if self.demo else
+                             "仅用于仿真学习。Gazebo 与腕部相机同时启动；真机使用前必须重新标定。", "notice")
         layout.addWidget(self.notice)
-        splitter = QSplitter(Qt.Vertical)
+        self.content_splitter = QSplitter(Qt.Vertical)
         self.pages = QStackedWidget()
         self.pages.addWidget(self._home_page())
         self.pages.addWidget(self._code_page())
         self.pages.addWidget(self._results_page())
         self.pages.addWidget(self._guide_page())
-        splitter.addWidget(self.pages)
-        log_frame, log_layout = _card("")
+        self.content_splitter.addWidget(self.pages)
+        self.log_frame, log_layout = _card("")
         log_head = QHBoxLayout()
         log_head.addWidget(_label("运行日志", "section"))
         log_head.addStretch()
-        log_head.addWidget(_button("打开日志目录", lambda: self._open(self.data_dir / "logs")))
+        log_head.addWidget(_button("打开目录", lambda: self._open(self.data_dir / "logs")))
         log_head.addWidget(_button("清空显示", lambda: self.log_view.clear()))
         log_layout.addLayout(log_head)
         self.log_view = QPlainTextEdit()
@@ -322,60 +339,106 @@ class WorkbenchWindow(QMainWindow):
         self.log_view.setMaximumBlockCount(1800)
         self.log_view.setObjectName("log")
         log_layout.addWidget(self.log_view)
-        splitter.addWidget(log_frame)
-        splitter.setSizes([round(540 * self.ui_scale), round(180 * self.ui_scale)])
-        splitter.setChildrenCollapsible(False)
-        layout.addWidget(splitter, 1)
-        self.footer = _label(f"工程：{self.root}    ·    记录仅用于本机学习反馈", "muted")
-        self.footer.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        layout.addWidget(self.footer)
+        self.log_frame.setMinimumHeight(140)
+        self.content_splitter.addWidget(self.log_frame)
+        self.content_splitter.setChildrenCollapsible(False)
+        self.content_splitter.setStretchFactor(0, 4)
+        self.content_splitter.setStretchFactor(1, 1)
+        self.log_frame.hide()
+        layout.addWidget(self.content_splitter, 1)
+        footer_row = QHBoxLayout()
+        self.footer = _label("本地仿真学习 · 配置和程序自动保存在本机", "muted")
+        self.footer.setToolTip(f"工程：{self.root}\n学习数据：{self.data_dir}")
+        footer_row.addWidget(self.footer, 1)
+        self.log_toggle = _button("展开日志", self._toggle_logs)
+        self.log_toggle.setCheckable(True)
+        footer_row.addWidget(self.log_toggle)
+        layout.addLayout(footer_row)
         row.addWidget(content, 1)
         self.setCentralWidget(outer)
         self._navigate(0)
+
+    def _toggle_logs(self):
+        visible = self.log_toggle.isChecked()
+        self.log_frame.setVisible(visible)
+        self.log_toggle.setText("收起日志" if visible else "展开日志")
+        if visible:
+            self.content_splitter.setSizes([max(300, self.height() - 340), 180])
+
+    def _scroll_panel(self, widget):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(widget)
+        return scroll
 
     def _home_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.gazebo_view = QFrame()
-        self.gazebo_view.setObjectName("card")
-        view_layout = QVBoxLayout(self.gazebo_view)
-        view_layout.addWidget(_label("Gazebo 仿真视图", "section"))
-        view_split = QSplitter(Qt.Horizontal)
-        self.gazebo_placeholder = QLabel("启动仿真后，Gazebo 原生窗口将直接嵌入此区域。")
+        self.workspace_splitter = QSplitter(Qt.Horizontal)
+        self.workspace_splitter.setChildrenCollapsible(False)
+        self.gazebo_view, view_layout = _card("")
+        viewport_heading = QHBoxLayout()
+        viewport_heading.addWidget(_label("仿真现场", "section"))
+        viewport_heading.addStretch()
+        viewport_heading.addWidget(_label("GAZEBO  /  RGB-D", "eyebrow"))
+        view_layout.addLayout(viewport_heading)
+        self.view_split = QSplitter(Qt.Vertical)
+        self.view_split.setChildrenCollapsible(False)
+        self.gazebo_placeholder = QLabel("等待仿真启动")
+        self.gazebo_placeholder.setToolTip("Gazebo 内嵌视图：机械臂、固定工位与台面")
         self.gazebo_placeholder.setWordWrap(True)
         self.gazebo_placeholder.setAttribute(Qt.WA_NativeWindow, True)
         self.gazebo_placeholder.setAttribute(Qt.WA_DontCreateNativeAncestors, False)
         self.gazebo_placeholder.setAlignment(Qt.AlignCenter)
         self.gazebo_placeholder.setScaledContents(False)
-        self.gazebo_placeholder.setMinimumHeight(250)
-        self.gazebo_placeholder.setStyleSheet("background:#111827;color:#cbd5e1;border-radius:8px")
-        view_split.addWidget(self.gazebo_placeholder)
+        self.gazebo_placeholder.setMinimumSize(160, 120)
+        self.gazebo_placeholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.gazebo_placeholder.setObjectName("viewport")
+        self.view_split.addWidget(self.gazebo_placeholder)
         camera_panel = QWidget()
         camera_layout = QVBoxLayout(camera_panel)
-        camera_layout.setContentsMargins(0, 0, 0, 0)
+        camera_layout.setContentsMargins(0, 8, 0, 0)
+        camera_layout.setSpacing(8)
         self.camera_title = _label("腕部相机（彩色）", "section")
         camera_layout.addWidget(self.camera_title)
-        self.camera_placeholder = QLabel("启动仿真后，腕部相机图像会在这里实时显示。")
+        self.camera_placeholder = QLabel("等待腕部相机")
+        self.camera_placeholder.setToolTip("腕部相机彩色画面；与仿真同时启动")
         self.camera_placeholder.setWordWrap(True)
         self.camera_placeholder.setAlignment(Qt.AlignCenter)
-        self.camera_placeholder.setMinimumWidth(260)
-        self.camera_placeholder.setStyleSheet("background:#111827;color:#cbd5e1;border-radius:8px")
+        self.camera_placeholder.setMinimumSize(160, 100)
+        self.camera_placeholder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.camera_placeholder.setObjectName("viewport")
         camera_layout.addWidget(self.camera_placeholder, 1)
-        self.recognition_status = QLabel("基础组识别：等待图像")
-        self.recognition_status.setWordWrap(True)
-        self.recognition_status.setObjectName("muted")
+        self.recognition_status = _label("基础组识别：等待图像", "muted")
         self.recognition_status.setVisible(False)
         camera_layout.addWidget(self.recognition_status)
-        view_split.addWidget(camera_panel)
-        view_split.setSizes([700, 400])
-        view_layout.addWidget(view_split, 1)
-        self.gazebo_view.setMinimumWidth(520)
+        self.view_split.addWidget(camera_panel)
+        self.view_split.setSizes([440, 220])
+        self.view_split.setStretchFactor(0, 2)
+        self.view_split.setStretchFactor(1, 1)
+        view_layout.addWidget(self.view_split, 1)
+        self.gazebo_view.setMinimumWidth(260)
+        self.workspace_splitter.addWidget(self.gazebo_view)
+        self.inspector = QTabWidget()
+        self.inspector.setObjectName("inspector")
+        self.inspector.setMinimumWidth(round(320 * self.ui_scale))
+        practice = QWidget()
+        practice_layout = QVBoxLayout(practice)
+        practice_layout.setContentsMargins(0, 12, 0, 0)
+        practice_layout.setSpacing(12)
+        pose_page = QWidget()
+        pose_column = QVBoxLayout(pose_page)
+        pose_column.setContentsMargins(0, 12, 0, 0)
+        environment = QWidget()
+        environment_layout = QVBoxLayout(environment)
+        environment_layout.setContentsMargins(0, 12, 0, 0)
+        environment_layout.setSpacing(12)
         card, cfg = _card("练习设置")
         grid = QGridLayout()
-        grid.addWidget(_label("运行模式", "muted"), 0, 0)
-        grid.addWidget(_label("题目种子（−1 随机）", "muted"), 0, 1)
-        grid.addWidget(_label("基础组显示", "muted"), 0, 2)
+        grid.setSpacing(8)
         self.mode_combo = QComboBox()
         self.mode_combo.addItem("基础练习 · Gazebo 仿真", "basic")
         self.mode_combo.addItem("基础组识别 · 几何体", "recognition")
@@ -394,31 +457,30 @@ class WorkbenchWindow(QMainWindow):
         self.velocity_spin.setValue(0.5)
         self.velocity_spin.setDecimals(1)
         self.velocity_spin.setSuffix(" ×")
-        grid.addWidget(self.mode_combo, 1, 0)
-        grid.addWidget(self.seed_spin, 1, 1)
-        grid.addWidget(self.backend_combo, 1, 2)
-        grid.addWidget(_label("参考速度", "muted"), 0, 3)
-        grid.addWidget(self.velocity_spin, 1, 3)
-        grid.setColumnStretch(0, 2)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(2, 1)
+        for row, (title, widget) in enumerate((("运行模式", self.mode_combo),
+                                               ("题目种子（−1 随机）", self.seed_spin),
+                                               ("基础组显示", self.backend_combo),
+                                               ("参考速度", self.velocity_spin))):
+            widget.setAccessibleName(title)
+            grid.addWidget(_label(title, "muted"), row * 2, 0)
+            grid.addWidget(widget, row * 2 + 1, 0)
         cfg.addLayout(grid)
         self.mode_description = _label("基础组 Gazebo 仿真；固定位置放置六类物件，二维码只给出抓取顺序。工作台内置相机用于观察，不承担基础组物体分类。", "muted")
         cfg.addWidget(self.mode_description)
-        layout.addWidget(card)
+        environment_layout.addWidget(card)
         pose_card, pose_layout = _card("基础组固定姿态调参")
         pose_layout.addWidget(_label(
-            "二维码只决定 1..6 的抓取顺序；物件位置和编号固定。调整仿真机械臂后，\n"
-            "记录的关节角会写入 track1_fixed_poses.yaml，完成全部姿态后官方基础模型会自动复用。\n"
-            "仿真数据是直观的初始参考，接入 JAKA Mini 2 真机仍需重新校准。", "muted"))
+            "工位固定，二维码决定抓取顺序。读取关节角、调整并记录；仅用于仿真，真机须重新标定。", "muted"))
         pose_grid = QGridLayout()
+        pose_grid.setSpacing(8)
         pose_grid.addWidget(_label("编号", "muted"), 0, 0)
         self.pose_station = QSpinBox()
+        self.pose_station.setAccessibleName("固定工位编号")
         self.pose_station.setRange(1, 6)
         self.pose_station.setValue(1)
         self.pose_station.valueChanged.connect(self._pose_phase_changed)
         pose_grid.addWidget(self.pose_station, 0, 1)
-        pose_grid.addWidget(_label("姿态阶段", "muted"), 0, 2)
+        pose_grid.addWidget(_label("姿态阶段", "muted"), 1, 0, 1, 4)
         self.pose_phase = QComboBox()
         for label, value in (("预抓取（编号）", "object:approach"),
                              ("抓取（编号）", "object:grasp"),
@@ -428,42 +490,81 @@ class WorkbenchWindow(QMainWindow):
                              ("投放（料盒）", "place:release"),
                              ("退出（料盒）", "place:retreat")):
             self.pose_phase.addItem(label, value)
+        self.pose_phase.setAccessibleName("姿态阶段")
         self.pose_phase.currentIndexChanged.connect(self._pose_phase_changed)
-        pose_grid.addWidget(self.pose_phase, 0, 3, 1, 3)
+        pose_grid.addWidget(self.pose_phase, 2, 0, 1, 4)
+        pose_grid.addWidget(_label("关节单位", "muted"), 3, 0, 1, 2)
+        self.joint_unit = QComboBox()
+        self.joint_unit.addItem("弧度 rad", "rad")
+        self.joint_unit.addItem("角度 °", "deg")
+        self.joint_unit.setAccessibleName("关节角度单位")
+        self.joint_unit.currentIndexChanged.connect(self._change_joint_unit)
+        pose_grid.addWidget(self.joint_unit, 3, 2, 1, 2)
+        self._joint_unit = "rad"
         self.joint_spins = []
         for i in range(6):
-            pose_grid.addWidget(_label(f"J{i + 1}", "muted"), 1, i)
+            pose_grid.addWidget(_label(f"J{i + 1}", "muted"), 4 + (i // 2) * 2, (i % 2) * 2, 1, 2)
             spin = QDoubleSpinBox()
             spin.setRange(-6.2832, 6.2832)
             spin.setDecimals(4)
             spin.setSingleStep(0.05)
             spin.setSuffix(" rad")
+            spin.setAccessibleName(f"J{i + 1} 关节角（弧度）")
             self.joint_spins.append(spin)
-            pose_grid.addWidget(spin, 2, i)
+            pose_grid.addWidget(spin, 5 + (i // 2) * 2, (i % 2) * 2, 1, 2)
         pose_layout.addLayout(pose_grid)
-        pose_buttons = QHBoxLayout()
+        pose_layout.addWidget(_label("关节点动（仅仿真）", "section"))
+        pose_layout.addWidget(_label("步长：按一次移动一次；连续：鼠标左键长按方向键才会移动，松开请求停止；短按请用步长模式。仅仿真，软件停止不是急停。", "muted"))
+        self.jog_mode = QComboBox()
+        self.jog_mode.setAccessibleName("关节点动控制方式")
+        self.jog_mode.addItem("步长", "step")
+        self.jog_mode.addItem("连续（长按不松开）", "continuous")
+        self.jog_mode.currentIndexChanged.connect(self._release_jog)
+        pose_layout.addWidget(self.jog_mode)
+        self.jog_step = QComboBox()
+        self.jog_step.setAccessibleName("关节点动步长")
+        for step in (1, 2, 3):
+            self.jog_step.addItem(f"步长 {step}°", step)
+        pose_layout.addWidget(self.jog_step)
+        jog_grid = QGridLayout()
+        self.jog_buttons = []
+        for i in range(6):
+            jog_grid.addWidget(_label(f"J{i + 1}", "muted"), i, 0)
+            for column, direction, text in ((1, -1, "−"), (2, 1, "+")):
+                button = _button(text, lambda: None)
+                button.pressed.connect(lambda j=i, d=direction, b=button: self._press_jog(j, d, b))
+                button.released.connect(self._release_jog)
+                button.installEventFilter(self)
+                button.setAccessibleName(f"J{i + 1} {'负' if direction < 0 else '正'}方向点动")
+                jog_grid.addWidget(button, i, column)
+                self.jog_buttons.append(button)
+        pose_layout.addLayout(jog_grid)
+        pose_layout.addWidget(_label("连续点动为关节运动，并非末端直线运动；停止需等待确认。", "muted"))
+        pose_buttons = QVBoxLayout()
         pose_buttons.addWidget(_button("读取当前关节角", self._read_current_joints))
         pose_buttons.addWidget(_button("移动到输入姿态", self._move_to_pose))
         pose_buttons.addWidget(_button("记录此姿态", self._record_pose, primary=True))
         self.pose_status = _label("等待仿真关节状态。", "muted")
         pose_buttons.addWidget(self.pose_status, 1)
         pose_layout.addLayout(pose_buttons)
-        waypoint_buttons = QHBoxLayout()
+        waypoint_buttons = QVBoxLayout()
         waypoint_buttons.addWidget(_button("追加阶段前路点", self._append_waypoint))
         waypoint_buttons.addWidget(_button("清空阶段前路点", self._clear_waypoints))
         self.waypoint_status = _label("中间路点按顺序在所选阶段前执行；抓取后转场在抬升后执行。", "muted")
         waypoint_buttons.addWidget(self.waypoint_status, 1)
         pose_layout.addLayout(waypoint_buttons)
-        example_buttons = QHBoxLayout()
+        example_buttons = QVBoxLayout()
         example_buttons.addWidget(_button("载入仿真基础姿态", self._load_simulation_example))
         example_buttons.addWidget(_label("仅默认仿真布局；覆盖前备份。不能用于真机。", "muted"), 1)
         pose_layout.addLayout(example_buttons)
-        self.pose_file_label = _label(f"配置：{self._pose_path()}", "muted")
+        self.pose_file_label = _label("配置自动保存在本机学习数据目录。", "muted")
+        self.pose_file_label.setToolTip(str(self._pose_path()))
         pose_layout.addWidget(self.pose_file_label)
-        layout.addWidget(pose_card)
-        middle = QHBoxLayout()
+        pose_column.addWidget(pose_card)
+        pose_column.addStretch()
         control, actions = _card("操作")
         action_grid = QGridLayout()
+        action_grid.setSpacing(8)
         self.check_button = _button("环境自检", self.check_now)
         self.launch_button = _button("启动环境", self.start_environment, primary=True)
         self.generate_button = _button("生成题目", self.generate)
@@ -472,21 +573,33 @@ class WorkbenchWindow(QMainWindow):
         self.stop_round_button = _button("停止本轮", self.stop_round, danger=True)
         self.reset_button = _button("重置场景", self.reset_scene)
         self.stop_stack_button = _button("关闭环境", self.stop_environment)
-        for i, button in enumerate((self.check_button, self.launch_button, self.generate_button,
-                                     self.reference_button, self.start_button, self.stop_round_button,
-                                     self.reset_button, self.stop_stack_button)):
-            action_grid.addWidget(button, i // 2, i % 2)
+        for row, (label, button) in enumerate((("01  准备环境", self.launch_button),
+                                                ("02  获取顺序", self.generate_button),
+                                                ("03  执行抓取", self.reference_button))):
+            action_grid.addWidget(_label(label, "muted"), row * 2, 0, 1, 2)
+            action_grid.addWidget(button, row * 2 + 1, 0, 1, 2)
+        action_grid.addWidget(self.start_button, 6, 0, 1, 2)
+        action_grid.addWidget(self.reset_button, 7, 0, 1, 2)
         self.stop_round_button.setToolTip("软件停止，不是真机安全急停；只用于本工作台的仿真。")
         actions.addLayout(action_grid)
         self.round_label = _label("等待启动环境", "section")
         self.scene_label = _label("题目：尚未生成", "muted")
         self.score_label = _label("完成：—    用时：—    分数：—", "muted")
-        actions.addWidget(self.round_label)
         actions.addWidget(self.scene_label)
         actions.addWidget(self.score_label)
-        actions.addStretch()
-        middle.addWidget(control, 1)
+        practice_layout.addWidget(control)
+        quick_start, quick_layout = _card("第一次练习")
+        quick_layout.addWidget(_label("先载入示例姿态，再生成题目和运行基础模型。官方模型准备完成后自动发令。", "muted"))
+        quick_layout.addWidget(_button("载入仿真基础姿态", self._load_simulation_example))
+        quick_layout.addWidget(_button("打开姿态调参", lambda: self.inspector.setCurrentIndex(1)))
+        practice_layout.addWidget(quick_start)
+        practice_layout.addStretch()
+        environment_actions = QHBoxLayout()
+        environment_actions.addWidget(self.check_button)
+        environment_actions.addWidget(self.stop_stack_button)
+        environment_layout.addLayout(environment_actions)
         checks, check_layout = _card("就绪检查")
+        checks.setMinimumHeight(round(280 * self.ui_scale))
         self.check_table = QTableWidget(0, 3)
         self.check_table.setHorizontalHeaderLabels(["检查项", "状态", "说明"])
         self.check_table.verticalHeader().hide()
@@ -496,35 +609,51 @@ class WorkbenchWindow(QMainWindow):
         self.check_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.check_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         check_layout.addWidget(self.check_table)
-        middle.addWidget(checks, 2)
-        middle.addWidget(self.gazebo_view, 3)
-        layout.addLayout(middle, 1)
+        environment_layout.addWidget(checks)
+        environment_layout.addStretch()
+        self.inspector.addTab(self._scroll_panel(practice), "练习流程")
+        self.inspector.addTab(self._scroll_panel(pose_page), "姿态调参")
+        self.inspector.addTab(self._scroll_panel(environment), "环境设置")
+        self.inspector.currentChanged.connect(lambda index: self._release_jog() if index != 1 else None)
+        inspector_panel = QWidget()
+        inspector_layout = QVBoxLayout(inspector_panel)
+        inspector_layout.setContentsMargins(0, 0, 0, 0)
+        inspector_layout.setSpacing(8)
+        inspector_layout.addWidget(self.inspector, 1)
+        # Keep software stop reachable while scrolling or editing poses/settings.
+        inspector_layout.addWidget(self.round_label)
+        inspector_layout.addWidget(self.stop_round_button)
+        self.workspace_splitter.addWidget(inspector_panel)
+        self.workspace_splitter.setSizes([800, round(370 * self.ui_scale)])
+        self.workspace_splitter.setStretchFactor(0, 3)
+        self.workspace_splitter.setStretchFactor(1, 0)
+        layout.addWidget(self.workspace_splitter, 1)
         return page
 
     def _code_page(self):
         page, layout = _card("我的程序")
         layout.addWidget(_label("示例读取生成的二维码 PNG，并使用已知工位坐标。它不是实时相机识别；代码在本机运行，没有安全沙箱。", "notice"))
-        line = QHBoxLayout()
         self.program_path = QLineEdit(str(self.settings.value("program_path", "")))
         self.program_path.setPlaceholderText("选择自己编写的 .py 文件")
+        self.program_path.setAccessibleName("学生程序路径")
         self.program_path.setReadOnly(True)
-        line.addWidget(self.program_path, 1)
-        line.addWidget(_button("选择程序", self.choose_program))
-        line.addWidget(_button("新建示例副本", self.new_program))
-        layout.addLayout(line)
-        buttons = QHBoxLayout()
-        buttons.addWidget(_button("用系统编辑器打开", self.edit_program))
+        layout.addWidget(self.program_path)
+        buttons = QGridLayout()
+        buttons.setSpacing(8)
+        buttons.addWidget(_button("选择程序", self.choose_program), 0, 0)
+        buttons.addWidget(_button("新建示例副本", self.new_program), 0, 1)
+        buttons.addWidget(_button("用系统编辑器打开", self.edit_program), 1, 0)
         self.student_button = _button("运行我的程序", self.run_student, primary=True)
-        buttons.addWidget(self.student_button)
-        buttons.addStretch()
-        buttons.addWidget(_label("先生成题目 → 运行程序 → 回控制台发令", "muted"))
+        buttons.addWidget(self.student_button, 1, 1)
         layout.addLayout(buttons)
+        layout.addWidget(_label("先生成题目 → 运行程序 → 回控制台发令", "muted"))
         self.code_preview = QPlainTextEdit()
+        self.code_preview.setMinimumHeight(round(180 * self.ui_scale))
         self.code_preview.setReadOnly(True)
         self.code_preview.setObjectName("code")
         layout.addWidget(self.code_preview, 1)
         self._load_preview()
-        return page
+        return self._scroll_panel(page)
 
     def _results_page(self):
         page, layout = _card("运行记录")
@@ -558,7 +687,7 @@ class WorkbenchWindow(QMainWindow):
         <h3>三种模式有什么区别？</h3>
         <p><b>基础练习：</b>二维码给出六个固定工位的顺序（例如 432165），不再依赖六个物体的类别识别。
         编号固定为 1 长方体、2 正方体、3 圆柱体、4 球体、5 三棱柱、6 六棱柱。
-        在本页「基础组固定姿态调参」区域调整关节角并记录姿态；全部记录完成后官方基础模型自动复用。
+        在控制台右侧「姿态调参」标签中调整关节角并记录姿态；全部记录完成后官方基础模型自动复用。
         Gazebo 姿态是仿真参考，真机 JAKA Mini 2 必须重新校准。</p>
         <p><b>基础组识别：</b>启动专用 Gazebo 几何体场景、移动腕部相机到识别位姿，并运行现有深度轮廓分类器；标注画面与识别清单显示在工作台相机栏，不弹出单独识别窗口。该识别演示不替代正式比赛判分。</p>
         <p><b>视觉练习：</b>复用现有 Gazebo 腕部相机 / YOLO 练习。
@@ -577,50 +706,36 @@ class WorkbenchWindow(QMainWindow):
 
     def _style(self):
         font = QFont("Noto Sans CJK SC")
-        # Scale the pixel-based stylesheet to match the desktop's logical DPI.
-        # This is important on 4K + GNOME fractional scaling, where X11 exposes
-        # a large virtual desktop but fixed 14px text remains physically tiny.
-        font.setPixelSize(round(14 * self.ui_scale))
+        font.setPixelSize(round(15 * self.ui_scale))
         self.setFont(font)
-        stylesheet = """
-        QMainWindow { background: #f2f4f7; color: #1d2939; }
-        QWidget { color: #263445; font-family: "Noto Sans CJK SC"; font-size: 14px; }
-        QFrame#sidebar { background: #142a36; }
-        #sidebar QLabel { color: #d9e6ec; }
-        QLabel[role="brand"] { font-size: 13px; letter-spacing: 2px; color: #75d4bf; font-weight: 700; }
-        QLabel[role="sideTitle"] { font-size: 22px; font-weight: 700; margin-top: 10px; }
-        QLabel[role="sideMuted"] { color: #8fa9b5; font-size: 11px; }
-        QLabel[role="title"] { font-size: 23px; font-weight: 700; }
-        QLabel[role="section"] { font-size: 14px; font-weight: 700; }
-        QLabel[role="muted"] { color: #66788b; font-size: 12px; }
-        QLabel[role="badge"] { background: #e2edf0; color: #245a64; border-radius: 14px; padding: 9px 15px; font-weight: 600; }
-        QLabel[role="notice"] { background: #eaf0f7; color: #48627c; padding: 10px 13px; border-radius: 7px; font-size: 11px; }
-        QFrame#card { background: white; border: 1px solid #e1e7ed; border-radius: 10px; }
-        QPushButton { background: #f6f8fa; border: 1px solid #d9e2e9; border-radius: 6px; padding: 6px 11px; }
-        QPushButton:hover { background: #e9f0f3; border-color: #9fb9c4; }
-        QPushButton[role="primary"] { background: #167969; border-color: #167969; color: white; font-weight: 600; }
-        QPushButton[role="primary"]:hover { background: #106455; }
-        QPushButton[role="danger"] { color: #b44741; background: #fff5f4; border-color: #f0d2cf; }
-        QPushButton:disabled { background: #f3f5f7; color: #aab4bf; border-color: #e5e9ee; }
-        QPushButton#nav { color: #b9cbd5; background: transparent; text-align: left; border: none; padding: 12px 10px; }
-        QPushButton#nav:checked { background: #26434f; color: #a4e6d5; }
-        QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit { background: #f8fafb; border: 1px solid #dbe3ea; border-radius: 5px; padding: 7px; min-height: 22px; }
-        QPlainTextEdit, QTextBrowser { background: #fbfcfd; border: none; padding: 5px; }
-        QPlainTextEdit#log { background: #172b37; color: #d4e3e9; border-radius: 5px; font-family: monospace; font-size: 11px; }
-        QPlainTextEdit#code { font-family: monospace; font-size: 12px; }
-        QTableWidget { border: none; background: white; gridline-color: #edf1f5; font-size: 11px; }
-        QHeaderView::section { font-size: 12px; background: #f5f7fa; color: #66788b; border: none; padding: 8px; text-align: left; }
-        QSplitter::handle { background: #e4e9ef; height: 4px; }
-        """
-        stylesheet = re.sub(
-            r"font-size:\s*(\d+)px",
-            lambda match: f"font-size: {round(int(match.group(1)) * self.ui_scale)}px",
-            stylesheet,
-        )
-        self.setStyleSheet(stylesheet)
+        self.setStyleSheet(stylesheet(self.ui_scale))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar"):
+            compact = self.width() < round(1180 * self.ui_scale)
+            self.sidebar.setFixedWidth(round((144 if compact else 176) * self.ui_scale))
+            self.sidebar_title.setText("学习\n工作台" if compact else "机器人学习\n工作台")
+            labels = ("练习控制台", "我的程序", "运行记录", "入门指南")
+            for i, (button, label) in enumerate(zip(self.nav_buttons, labels)):
+                button.setText(label if compact else f"{i + 1:02}   {label}")
+        if hasattr(self, "view_split"):
+            # Stack the live images in VM windows; wide screens can show both side by side.
+            orientation = Qt.Horizontal if self.width() >= round(1700 * self.ui_scale) else Qt.Vertical
+            if self.view_split.orientation() != orientation:
+                self.view_split.setOrientation(orientation)
+                self.view_split.setSizes([600, 320])
 
     def _navigate(self, index):
+        if index != 0:
+            self._release_jog()
         self.pages.setCurrentIndex(index)
+        titles = (("练习控制台", "先运行基础模型，再调好每一个姿态。"),
+                  ("我的程序", "从官方示例开始，逐步优化自己的抓取流程。"),
+                  ("运行记录", "回看每轮顺序、用时与成绩。"),
+                  ("入门指南", "了解操作步骤与仿真使用边界。"))
+        self.page_title.setText(titles[index][0])
+        self.page_subtitle.setText(titles[index][1])
         for i, button in enumerate(self.nav_buttons):
             button.setChecked(i == index)
 
@@ -677,7 +792,9 @@ class WorkbenchWindow(QMainWindow):
         self._start_after_check = False
         if should_start:
             if failed:
-                self.notice.setText("运行依赖尚未齐全，请按就绪检查的说明处理。工作台没有自动安装或修改系统。")
+                self.notice.setText("运行依赖尚未齐全，请查看右侧「环境设置」中的自检结果。工作台没有修改系统。")
+                self._navigate(0)
+                self.inspector.setCurrentIndex(2)
             elif conflicts:
                 self._log("已阻止重复启动：上方列出了冲突进程 PID 和命令，不会清理或接管外部仿真。")
                 self._log("处理方法：回到原仿真启动终端按 Ctrl+C；仅关闭 Gazebo/RViz 窗口可能留下 ROS 后台。确认进程退出后，再点「启动环境」重新检查。")
@@ -790,6 +907,8 @@ class WorkbenchWindow(QMainWindow):
         self.scene, self.score = {}, None
         self.run_state = "idle"
         self.last_status = 0.0
+        self.joint_sample_at = 0.0
+        self.joint_positions = {}
         self.stack_started = time.monotonic()
         self._closing_stack = False
         backend = self.backend_combo.currentData() or "gazebo"
@@ -823,6 +942,9 @@ class WorkbenchWindow(QMainWindow):
             self._log("已启动本工作台环境，等待就绪。")
         except Exception as exc:
             self._log(f"启动失败：{exc}")
+            self.notice.setText(f"启动失败：{exc}。请展开日志查看详情。")
+            if not self.log_toggle.isChecked():
+                self.log_toggle.click()
             self.manager.stop_all()
         self._update_buttons()
 
@@ -838,6 +960,11 @@ class WorkbenchWindow(QMainWindow):
     def _runner_active(self):
         return self._demo_running if self.demo else (self._program_inflight or self.manager.alive("program"))
 
+    def _pose_busy(self):
+        # Keep the lock until the process exit event is consumed, even if the
+        # child has exited; otherwise a delayed protocol result can be lost.
+        return self._jog_fault or self._pose_inflight or self.manager.alive("pose")
+
     def _service_busy(self):
         # OS 进程死亡不等于 GUI 已消费该请求的结果/退出事件。
         return self._service_inflight or self.manager.alive("service")
@@ -845,12 +972,12 @@ class WorkbenchWindow(QMainWindow):
     def _can_start_program(self):
         return (self.ready and self._has_stack() and self.mode == "basic"
                 and self.run_state == "armed" and not self._runner_active()
-                and not self._service_busy() and not self._closing_stack)
+                and not self._service_busy() and not self._pose_busy() and not self._closing_stack)
 
     def start_round(self):
         if (not self.ready or not self._has_stack() or self.mode != "basic"
                 or self.run_state != "armed" or self._closing_stack
-                or self._service_busy() or self._auto_start_reference):
+                or self._service_busy() or self._pose_busy() or self._auto_start_reference):
             return
         if not self.demo and not self._runner_active():
             self._log("请先启动学生程序，确认程序正在等待发令；参考程序会自动发令。")
@@ -860,7 +987,7 @@ class WorkbenchWindow(QMainWindow):
     def generate(self):
         if (not self.ready or not self._has_stack() or self.mode != "basic"
                 or self._runner_active() or self.run_state == "running"
-                or self._service_busy() or self._closing_stack):
+                or self._service_busy() or self._pose_busy() or self._closing_stack):
             return
         if self.demo:
             self.scene = {"seed": self.seed_spin.value(), "object_count": 6}
@@ -931,7 +1058,7 @@ class WorkbenchWindow(QMainWindow):
     def reset_scene(self):
         if (not self.ready or not self._has_stack() or self.mode != "basic"
                 or self._runner_active() or self.run_state == "running"
-                or self._service_busy() or self._closing_stack):
+                or self._service_busy() or self._pose_busy() or self._closing_stack):
             return
         if self.demo:
             self._demo_epoch += 1
@@ -944,6 +1071,7 @@ class WorkbenchWindow(QMainWindow):
         self._update_buttons()
 
     def stop_environment(self):
+        self._release_jog()
         self._auto_start_reference = False
         self._service_queue = []
         self.ready = False
@@ -965,9 +1093,14 @@ class WorkbenchWindow(QMainWindow):
             self.ready = bool(payload.get("ready")) and self.manager.alive("stack") and not self._closing_stack
             self.run_state = payload.get("run_state", "idle")
             self.scene = payload.get("scene") or {}
-            self.joint_positions = payload.get("joint_positions") or self.joint_positions
             joint_age = payload.get("joint_age_s")
-            if joint_age is not None and joint_age > 4.0:
+            positions = payload.get("joint_positions")
+            if isinstance(positions, dict) and isinstance(joint_age, (int, float)) and math.isfinite(joint_age) and joint_age >= 0:
+                self.joint_positions = positions
+                self.joint_sample_at = self.last_status - joint_age
+            else:
+                self.joint_sample_at = 0.0
+            if isinstance(joint_age, (int, float)) and joint_age > 4.0:
                 self.pose_status.setText(f"关节状态已过期（{joint_age:.1f}s），暂不建议记录姿态。")
             new_score = payload.get("score")
             if new_score and new_score != self.score:
@@ -982,6 +1115,15 @@ class WorkbenchWindow(QMainWindow):
             self._service_success = bool(payload.get("success"))
             self._service_payload = payload
             self._log(f"{payload.get('name')}：{payload.get('message', '')}")
+        elif kind == "jog-result" and name == "pose":
+            self._jog_result_received = True
+            self._jog_held = None
+            outcome = payload.get("outcome")
+            if outcome == "uncertain" or outcome not in ("stopped", "completed", "failed", "rejected"):
+                self._jog_fault = True
+                self.pose_status.setText("停止状态未确认：已锁定运动，请关闭仿真环境检查。 " + str(payload.get("detail", "")))
+            else:
+                self.pose_status.setText("连续点动：" + str(payload.get("detail", "")))
         elif kind == "pose-move" and name == "pose":
             self.pose_status.setText("姿态移动完成。" if payload.get("success") else
                                      f"姿态移动失败：{payload.get('detail', '')}")
@@ -1019,7 +1161,7 @@ class WorkbenchWindow(QMainWindow):
                 return
             pixmap = QPixmap.fromImage(image)
             self.camera_placeholder.setPixmap(
-                pixmap.scaled(self.camera_placeholder.size(), Qt.KeepAspectRatio,
+                pixmap.scaled(self.camera_placeholder.contentsRect().size(), Qt.KeepAspectRatio,
                               Qt.SmoothTransformation))
             self.camera_placeholder.setText("")
             self.camera_placeholder.setToolTip("来自 Gazebo 腕部 RGB-D 相机的实时彩色图像")
@@ -1056,8 +1198,15 @@ class WorkbenchWindow(QMainWindow):
                     self._auto_start_reference = False
                     self._service_queue = []
                 elif name == "pose":
-                    if event.get("returncode") not in (0, 130):
-                        self.pose_status.setText("姿态移动进程异常退出。")
+                    if getattr(self, "_jog_session", False) and not self._jog_result_received:
+                        self._jog_fault = True
+                        self.pose_status.setText("连续点动进程异常结束，运动状态未知；请关闭仿真环境检查。")
+                    self._jog_session = False
+                    self._jog_held = None
+                    self.manager.close_input("pose")
+                    self._pose_inflight = False
+                    if event.get("returncode") not in (0, 130) and not self._jog_result_received:
+                        self.pose_status.setText("姿态移动进程异常退出；请检查仿真状态。")
                 elif name == "program":
                     self._program_inflight = False
                     self._auto_start_reference = False
@@ -1082,6 +1231,11 @@ class WorkbenchWindow(QMainWindow):
             elif event.get("kind") == "error":
                 self._log(f"[{name}] {event.get('text', '')}")
         now = time.monotonic()
+        if self._jog_held:
+            if (not self.ready or self.run_state == "running" or self._runner_active()
+                    or not self.joint_sample_at or now - self.joint_sample_at >= JOINT_FEEDBACK_MAX_AGE
+                    or not self.manager.write_input("pose", f"H{time.monotonic():.9f}\n".encode())):
+                self._release_jog()
         if self.last_status and now - self.last_status > 5:
             self.ready = False
             self.status_badge.setText("状态反馈中断")
@@ -1091,6 +1245,7 @@ class WorkbenchWindow(QMainWindow):
             self._log("参考程序准备超时，已取消自动发令。检查 MoveIt 和题目状态。")
         if self._closing_stack and not self.manager.active_names():
             self._closing_stack = False
+            self._jog_fault = False
             self._clear_camera_view("仿真已停止")
             self.scene, self.score = {}, None
             self.run_state = "idle"
@@ -1106,6 +1261,7 @@ class WorkbenchWindow(QMainWindow):
         basic = self.mode == "basic"
         armed = self.run_state == "armed"
         running = self.run_state == "running"
+        pose_busy = self._pose_busy()
         idle_controls = not stack and not self._checking and not self._closing_stack
         self.mode_combo.setEnabled(idle_controls)
         self.seed_spin.setEnabled(idle_controls and basic)
@@ -1113,14 +1269,14 @@ class WorkbenchWindow(QMainWindow):
         self.backend_combo.setEnabled(idle_controls and basic)
         self.check_button.setEnabled(not self._checking and not self._closing_stack and not stack)
         self.launch_button.setEnabled(idle_controls)
-        self.generate_button.setEnabled(stack and self.ready and basic and not runner and not running and not busy)
-        self.reference_button.setEnabled(stack and self.ready and basic and armed and not runner and not busy)
-        self.start_button.setEnabled(stack and self.ready and basic and armed and not busy
+        self.generate_button.setEnabled(stack and self.ready and basic and not runner and not running and not busy and not pose_busy)
+        self.reference_button.setEnabled(stack and self.ready and basic and armed and not runner and not busy and not pose_busy)
+        self.start_button.setEnabled(stack and self.ready and basic and armed and not busy and not pose_busy
                                      and not self._auto_start_reference and (self.demo or runner))
-        self.student_button.setEnabled(stack and self.ready and basic and armed and not runner and not busy
+        self.student_button.setEnabled(stack and self.ready and basic and armed and not runner and not busy and not pose_busy
                                        and bool(self.program_path.text()))
         self.stop_round_button.setEnabled(stack and basic and (running or runner))
-        self.reset_button.setEnabled(stack and self.ready and basic and not runner and not running and not busy)
+        self.reset_button.setEnabled(stack and self.ready and basic and not runner and not running and not busy and not pose_busy)
         self.stop_stack_button.setEnabled(stack and not self._closing_stack)
         if self._closing_stack:
             badge = "正在关闭"
@@ -1237,8 +1393,7 @@ class WorkbenchWindow(QMainWindow):
                     f"{i}: " + ", ".join(f"{v:.4f}" for v in point)
                     for i, point in enumerate(points, 1)) or "暂无路点")
             if isinstance(values, list) and len(values) == 6:
-                for spin, value in zip(self.joint_spins, values):
-                    spin.blockSignals(True); spin.setValue(float(value)); spin.blockSignals(False)
+                self._set_joint_values(values)
                 self.pose_status.setText("已载入已保存姿态；不会自动移动机械臂。")
             elif phase == "transfer":
                 self.pose_status.setText("转场只使用路点；输入框保留原值，请确认后再追加。")
@@ -1247,37 +1402,154 @@ class WorkbenchWindow(QMainWindow):
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self.pose_status.setText(f"姿态配置读取失败：{exc}")
 
+    def _joint_values(self):
+        values = [spin.value() for spin in self.joint_spins]
+        return [math.radians(v) for v in values] if self._joint_unit == "deg" else values
+
+    def _set_joint_values(self, values):
+        for spin, value in zip(self.joint_spins, values):
+            spin.setValue(math.degrees(float(value)) if self._joint_unit == "deg" else float(value))
+
+    def _change_joint_unit(self):
+        if not hasattr(self, "joint_spins"):
+            return
+        values = self._joint_values()
+        self._joint_unit = self.joint_unit.currentData()
+        degrees = self._joint_unit == "deg"
+        for i, spin in enumerate(self.joint_spins):
+            spin.blockSignals(True)
+            spin.setDecimals(8)
+            limit = math.degrees(6.2832) if degrees else 6.2832
+            spin.setRange(-limit, limit)
+            spin.setSingleStep(1 if degrees else 0.05)
+            spin.setSuffix(" °" if degrees else " rad")
+            spin.setAccessibleName(f"J{i + 1} 关节角（{'角度' if degrees else '弧度'}）")
+        self._set_joint_values(values)
+        for spin in self.joint_spins:
+            spin.blockSignals(False)
+
+    def eventFilter(self, watched, event):
+        if (watched is self._jog_held and event.type() in
+                (QEvent.Leave, QEvent.FocusOut, QEvent.Hide, QEvent.UngrabMouse)):
+            self._release_jog()
+        return super().eventFilter(watched, event)
+
+    def event(self, event):
+        if event.type() in (QEvent.WindowDeactivate, QEvent.Hide) and hasattr(self, "_jog_held"):
+            self._release_jog()
+        return super().event(event)
+
+    def _release_jog(self, *_):
+        if self._jog_held is not None:
+            self._jog_held = None
+            self.manager.close_input("pose")
+            self.pose_status.setText("已请求停止连续点动，等待运动终态确认……")
+
+    def _press_jog(self, joint, direction, button):
+        if self.jog_mode.currentData() == "step":
+            self._jog_once(joint, direction)
+            return
+        if self.demo:
+            self.pose_status.setText("演示模式不移动真实/仿真机械臂。")
+            return
+        if (self._pose_busy() or self._runner_active() or self.run_state == "running"
+                or self._service_busy() or self._closing_stack or self.mode != "basic"
+                or not self._has_stack() or not self.ready):
+            self.pose_status.setText("环境未就绪、其他操作正在执行或停止状态未确认，不能连续点动。")
+            return
+        values = [self.joint_positions.get(f"joint_{i}") for i in range(1, 7)]
+        if (not self.joint_sample_at or time.monotonic() - self.joint_sample_at >= JOINT_FEEDBACK_MAX_AGE
+                or any(not isinstance(v, (int, float)) or not math.isfinite(v) for v in values)):
+            self.pose_status.setText("关节反馈不完整或已过期，不能连续点动。")
+            return
+        try:
+            self.manager.launch("pose", self._bridge("continuous-jog", "--joint", str(joint),
+                                "--direction", str(direction), "--velocity",
+                                str(min(0.1, self.velocity_spin.value())), "--backend", "simulation"),
+                                self.root, self._env(), input_pipe=True)
+            self._pose_inflight = True
+            self._jog_session = True
+            self._jog_result_received = False
+            self._jog_held = button
+            if not self.manager.write_input("pose", f"H{time.monotonic():.9f}\n".encode()):
+                self._release_jog()
+            else:
+                self.pose_status.setText(f"J{joint + 1} 连续点动已启动，正在准备运动；请保持长按，松开请求停止。")
+            self._update_buttons()
+        except Exception as exc:
+            self.pose_status.setText(f"连续点动启动失败：{exc}")
+
+    def _jog_once(self, joint, direction):
+        if self.demo:
+            self.pose_status.setText("演示模式不移动真实/仿真机械臂。")
+            return
+        if self._runner_active() or self.run_state == "running" or self._pose_busy():
+            self.pose_status.setText("本轮或姿态运动正在执行，不能点动。")
+            return
+        if self._service_busy() or self._closing_stack or self.mode != "basic":
+            self.pose_status.setText("环境正在操作或不在基础组仿真模式，不能点动。")
+            return
+        if not self._has_stack() or not self.ready:
+            self.pose_status.setText("请先启动并等待仿真环境就绪。")
+            return
+        if not self.joint_sample_at or time.monotonic() - self.joint_sample_at >= JOINT_FEEDBACK_MAX_AGE:
+            self.pose_status.setText("关节反馈已过期，不能点动；请等待最新状态。")
+            return
+        values = [self.joint_positions.get(f"joint_{i}") for i in range(1, 7)]
+        if any(not isinstance(v, (int, float)) or not math.isfinite(v) for v in values):
+            self.pose_status.setText("关节反馈不完整，不能点动。")
+            return
+        values[joint] += direction * math.radians(self.jog_step.currentData())
+        if abs(values[joint]) > 6.2832:
+            self.pose_status.setText("目标超出关节输入范围，已拒绝点动。")
+            return
+        try:
+            self.manager.launch("pose", self._bridge("move-joints", "--joints", *[format(v, ".12f") for v in values],
+                                "--velocity", str(self.velocity_spin.value()), "--backend", "simulation"),
+                                self.root, self._env())
+            self._pose_inflight = True
+            self.joint_sample_at = 0.0
+            self._update_buttons()
+            self.pose_status.setText(f"J{joint + 1} 正在执行单次点动；模型限位由运动规划器检查。")
+        except Exception as exc:
+            self.pose_status.setText(f"点动失败：{exc}")
+
     def _read_current_joints(self):
         values = [self.joint_positions.get(f"joint_{i}") for i in range(1, 7)]
-        if any(v is None for v in values):
-            self.pose_status.setText("尚未收到 6 个关节角，请先启动环境。")
+        if (not self.joint_sample_at or time.monotonic() - self.joint_sample_at >= JOINT_FEEDBACK_MAX_AGE
+                or any(not isinstance(v, (int, float)) or not math.isfinite(v) for v in values)):
+            self.pose_status.setText("关节反馈不完整或已过期，请等待最新状态。")
             return
-        for spin, value in zip(self.joint_spins, values):
-            spin.setValue(float(value))
+        self._set_joint_values(values)
         self.pose_status.setText("已读取当前机械臂姿态。")
 
     def _move_to_pose(self):
-        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+        if self._runner_active() or self.run_state == "running" or self._pose_busy():
             self.pose_status.setText("本轮或姿态运动正在执行；请先停止，不能并发发送姿态运动。")
             return
-        values = [spin.value() for spin in self.joint_spins]
+        values = self._joint_values()
         if self.demo:
             self.pose_status.setText("演示模式不移动真实/仿真机械臂。")
+            return
+        if self._service_busy() or self._closing_stack or self.mode != "basic":
+            self.pose_status.setText("环境正在操作或不在基础组仿真模式，不能移动。")
             return
         if not self._has_stack() or not self.ready:
             self.pose_status.setText("请先启动并等待环境就绪。")
             return
         try:
-            self.manager.launch("pose", self._bridge("move-joints", "--joints", *[str(v) for v in values],
+            self.manager.launch("pose", self._bridge("move-joints", "--joints", *[format(v, ".12f") for v in values],
                                                      "--velocity", str(self.velocity_spin.value()),
                                                      "--backend", "simulation"),
                                 self.root, self._env())
+            self._pose_inflight = True
+            self._update_buttons()
             self.pose_status.setText("正在移动到输入姿态……")
         except Exception as exc:
             self.pose_status.setText(f"移动失败：{exc}")
 
     def _record_pose(self):
-        values = [spin.value() for spin in self.joint_spins]
+        values = self._joint_values()
         path = self._pose_path()
         try:
             kind, phase = self._pose_key()
@@ -1298,7 +1570,7 @@ class WorkbenchWindow(QMainWindow):
 
 
     def _load_simulation_example(self):
-        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+        if self._runner_active() or self.run_state == "running" or self._pose_busy():
             self.pose_status.setText("请先停止本轮和姿态运动，再载入仿真基础姿态。")
             return
         if QMessageBox.question(
@@ -1310,7 +1582,7 @@ class WorkbenchWindow(QMainWindow):
             return
         # Modal dialogs process Qt events: a program can start while the
         # confirmation is open, so recheck before replacing any configuration.
-        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+        if self._runner_active() or self.run_state == "running" or self._pose_busy():
             self.pose_status.setText("确认期间已开始运行，未替换姿态配置；请先停止。")
             return
         try:
@@ -1336,7 +1608,7 @@ class WorkbenchWindow(QMainWindow):
         try:
             kind, phase = self._pose_key()
             station = self.pose_station.value() if kind == "object" else None
-            values = None if clear else [spin.value() for spin in self.joint_spins]
+            values = None if clear else self._joint_values()
             data = self._fixed_pose_api().update_waypoints(
                 str(self._pose_path()), station=station, phase=phase, joints=values, clear=clear)
             target = data["objects"][str(station)] if station is not None else data["place"]
@@ -1457,6 +1729,7 @@ class WorkbenchWindow(QMainWindow):
         if self._shutdown_done:
             return
         self._shutdown_done = True
+        self._release_jog()
         self.timer.stop()
         self._demo_epoch += 1
         self.manager.close(timeout=7.0)

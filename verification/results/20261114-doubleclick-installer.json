@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-14",
+  "artifact": "dist/jaka-student-20261114-doubleclick-candidate.tar.gz",
+  "sha256": "d3d30d0ce82cf5290c4b8fdf77aa92d0cba2d5901e34ebf29f4b960105000419",
+  "archive_files_verified": 1147,
+  "launcher_executable_in_archive": true,
+  "desktop_file_validate": "passed",
+  "tests": {
+    "passed": 1125,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 17.746
+  },
+  "gio_tests": "real desktop parser/Exec launch with fake installer and Terminal=false; adjacent path and copied-to-desktop HOME fallback",
+  "terminal_retention": "isatty/input branch tested without GUI",
+  "system_changes": "none; no apt/sudo/simulation commands launched",
+  "clean_vm_installation": "not_run",
+  "graphical_doubleclick_trust_and_terminal_acceptance": "not_run",
+  "student_vm_acceptance": "not_run",
+  "hardware_acceptance": "not_run"
+}

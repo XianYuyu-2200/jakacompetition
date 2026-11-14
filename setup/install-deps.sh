@@ -12,6 +12,11 @@ fi
 ${SUDO} apt-get update
 
 ${SUDO} apt-get install -y \
+  build-essential \
+  cmake \
+  pkg-config \
+  xdg-user-dirs \
+  fonts-noto-cjk \
   python3-colcon-common-extensions \
   python3-pyqt5 \
   python3-yaml \

@@ -1,0 +1,111 @@
+{
+  "date": "2026-11-14",
+  "scope": "native-PyQt5-layout-refresh",
+  "skill": {
+    "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+    "path": ".claude/skills/ui-ux-pro-max",
+    "installed": true,
+    "search_executed": true,
+    "skill_md_sha256": "14f43337edfbf7822e091428e4ae0c6f92f86e3353deda6a30f6613121e2cf2d"
+  },
+  "tests": {
+    "command": "QT_QPA_PLATFORM=offscreen PYTHONPATH=\"$PWD:$PWD/jaka_competition_kit:$PYTHONPATH\" /usr/bin/python3 -m pytest -q workbench/test jaka_competition_kit/test setup/test (ROS Humble and local workspace sourced)",
+    "tests": 1136,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 18.552
+  },
+  "window_matrix": [
+    {
+      "width": 960,
+      "height": 620,
+      "scale": 1
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "scale": 1
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scale": 1.75
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.75
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1024x768-1-practice-demo.png",
+      "sha256": "64797637b8bae1a35265a97eb18f0c2a367f4982d408e13baa8d34275c93a343",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1366x768-1-environment-demo.png",
+      "sha256": "5d71371387d9b8480b7f0001e98ef638270363d422ab4da7eb7d17cb231bae0f",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1366x768-1-pose-demo.png",
+      "sha256": "2636b5919d01b3ad1371fa87235236e6c83d943870a7637ae0afdf47d6fe1e1e",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1366x768-1-practice-demo.png",
+      "sha256": "09779879bfeda084ad6839551ec94c4c12a6ab59e3769dd9f4674df62ba3bba5",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1366x768-1.75-pose-demo.png",
+      "sha256": "7a79e74ab01de9c938dfa311a5ff66c70ff61e6e98418bc05234d00e984eab55",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/1920x1080-1-practice-demo.png",
+      "sha256": "9577a6cb44eb557f82ba42f1b55b9b99796fcc7fb027886a22e9fc3610399706",
+      "demo_only": true
+    },
+    {
+      "path": "verification/screenshots/20261114-ui-refresh/before-1366x768-demo.png",
+      "sha256": "145ed2be8f104398a0b3d57e66d49e469e0cca13ebc97cd2f7f8a768e30a5f23",
+      "demo_only": true
+    }
+  ],
+  "safety": {
+    "robot_started": false,
+    "gazebo_started": false,
+    "user_calibration_modified": false,
+    "global_process_cleanup_performed": false
+  },
+  "not_run": [
+    "clean_student_vm_install",
+    "live_gazebo_x11_embedding",
+    "live_camera",
+    "wayland",
+    "physical_robot",
+    "screen_reader"
+  ],
+  "package": "dist/jaka-student-20261114-ui-refresh-candidate.tar.gz",
+  "archive_validation": {
+    "sha256": "e0458945d4dbd1a5e94e5795161716530fa7a7def8ae345ae9c021f5a637d177",
+    "files": 1150,
+    "new_ui_files_included": true,
+    "new_ui_hashes_verified": true,
+    "extracted_package_ui_demo_smoke": "passed",
+    "clean_vm_install": "not_run"
+  }
+}

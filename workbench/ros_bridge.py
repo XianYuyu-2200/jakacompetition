@@ -358,6 +358,226 @@ def monitor(mode: str, camera: bool = False, recognition: bool = False) -> int:
 
 
 
+def guarded_move_goal(node, action_client, goal, deadman, *,
+                      accept_timeout=5.0, motion_timeout=15.0, cancel_timeout=3.0):
+    """Execute one owned MoveGroup goal with a deadman and confirmed termination.
+
+    This is a building block for simulation-only hold-to-jog, not a hardware
+    safety stop. A missing acceptance or terminal result is *uncertain*, never
+    a successful stop. Callers must lock out new motion on uncertainty. The
+    caller must maintain deadman independently of this process (e.g. a pipe
+    heartbeat with an expiry) and must not use this with real hardware.
+    """
+    import rclpy
+
+    def outcome(name, detail):
+        return {"outcome": name, "detail": detail}
+
+    if not deadman():
+        return outcome("stopped", "未发送目标：按住信号已失效")
+    try:
+        pending = action_client.send_goal_async(goal)
+        deadline = time.monotonic() + accept_timeout
+        stopped = False
+        # A release before acceptance is latched: cancel immediately if the
+        # server accepts later. Never issue a second goal during this interval.
+        while not pending.done():
+            stopped = stopped or not deadman()
+            if time.monotonic() >= deadline or not rclpy.ok():
+                return outcome("uncertain", "目标接受状态未确认")
+            rclpy.spin_once(node, timeout_sec=0.05)
+        handle = pending.result()
+        if handle is None:
+            return outcome("uncertain", "目标接受结果缺失")
+        if not handle.accepted:
+            return outcome("rejected", "目标被拒绝")
+        result = handle.get_result_async()
+        deadline = time.monotonic() + motion_timeout
+        cancel = None
+        cancel_deadline = None
+        cancel_response_checked = False
+        cancel_rejected_at = None
+        while not result.done():
+            stopped = stopped or not deadman() or time.monotonic() >= deadline
+            if stopped and cancel is None:
+                cancel = handle.cancel_goal_async()
+                cancel_deadline = time.monotonic() + cancel_timeout
+            if cancel is not None and cancel.done() and not cancel_response_checked:
+                cancel_response_checked = True
+                response = cancel.result()
+                # A rejected cancel can race with a goal that has just reached
+                # its terminal state. Allow that result callback to arrive;
+                # only then distinguish an already-finished goal from an
+                # active goal whose cancel was genuinely refused.
+                if response is None or not response.goals_canceling:
+                    cancel_rejected_at = time.monotonic()
+            if (cancel_rejected_at is not None
+                    and time.monotonic() - cancel_rejected_at >= 0.5):
+                return outcome("uncertain", "取消请求未获接受且目标尚未结束")
+            if cancel_deadline is not None and time.monotonic() >= cancel_deadline:
+                return outcome("uncertain", "取消后未收到目标终态")
+            if not rclpy.ok():
+                return outcome("uncertain", "ROS 中断，目标状态未知")
+            rclpy.spin_once(node, timeout_sec=0.05)
+        response = result.result()
+        if response is None or getattr(response, "status", None) not in (4, 5, 6):
+            return outcome("uncertain", "未收到有效目标终态")
+        if response.status == 4:
+            error = getattr(getattr(response, "result", None), "error_code", None)
+            if error is None or getattr(error, "val", None) != 1:
+                return outcome("failed", "目标结束但运动规划或执行失败")
+            return outcome("completed", "目标完成")
+        if response.status == 5:
+            return outcome("stopped", "目标已取消并收到终态")
+        return outcome("failed", "目标终止失败")
+    except Exception as exc:
+        return outcome("uncertain", f"运动或取消过程异常：{exc}")
+
+
+class PipeDeadman:
+    """Timestamped heartbeats: expiry, malformed data and EOF latch off."""
+    def __init__(self, fd, timeout=0.7):
+        import os
+        self.fd, self.timeout = fd, timeout
+        self.last = 0.0
+        self.buffer = b""
+        self.stopped = False
+        os.set_blocking(fd, False)
+
+    def __call__(self):
+        import os
+        if self.stopped:
+            return False
+        try:
+            while True:
+                try:
+                    data = os.read(self.fd, 4096)
+                except BlockingIOError:
+                    break
+                if not data:
+                    self.stopped = True
+                    break
+                self.buffer += data
+                if len(self.buffer) > 8192:
+                    self.stopped = True
+                    break
+                while b"\n" in self.buffer:
+                    line, self.buffer = self.buffer.split(b"\n", 1)
+                    try:
+                        if not line.startswith(b"H"):
+                            raise ValueError("invalid heartbeat")
+                        stamp = float(line[1:])
+                        now = time.monotonic()
+                        if not math.isfinite(stamp) or stamp > now + 0.05 or stamp < self.last:
+                            raise ValueError("invalid timestamp")
+                        self.last = stamp
+                    except ValueError:
+                        self.stopped = True
+                        break
+                if self.stopped:
+                    break
+        except OSError:
+            self.stopped = True
+        if not self.last or time.monotonic() - self.last > self.timeout:
+            self.stopped = True
+        return not self.stopped
+
+
+def _bounded_jog_target(current, limits, direction, segment=0.02, margin=0.02):
+    """Return one small bounded joint increment, or None near the limit."""
+    import math
+    lo, hi = limits
+    if (direction not in (-1, 1) or not all(math.isfinite(v) for v in
+            (current, lo, hi, segment, margin)) or hi - lo <= 2 * margin
+            or segment <= 0 or margin < 0):
+        raise ValueError("关节点动参数或模型限位无效")
+    target = min(hi - margin, current + segment) if direction > 0 \
+             else max(lo + margin, current - segment)
+    return target if direction * (target - current) > 0.001 else None
+
+
+def continuous_jog(joint, direction, velocity=0.1, backend="simulation"):
+    """Bounded, cancellable joint-space jog, only for owned simulation.
+
+    Unlike a single goal to the joint limit, this sends short PTP increments
+    (at most 0.08 rad). The deadman is checked between increments and each
+    active goal must reach a terminal result before this process exits.
+    """
+    import math
+    import rclpy
+    from jaka_competition_kit.backend import MoveGroupBackend
+    from jaka_competition_kit.fixed_poses import validate_joints
+    deadman = PipeDeadman(sys.stdin.fileno())
+    rclpy.init()
+    node = rclpy.create_node("workbench_continuous_jog")
+    sent = False
+    try:
+        if backend != "simulation" or joint not in range(6) or direction not in (-1, 1):
+            raise ValueError("无效仿真点动参数")
+        if not math.isfinite(velocity) or not 0 < velocity <= 0.2:
+            raise ValueError("连续点动速度超出仿真安全范围")
+        arm = MoveGroupBackend(node, vel_scale=velocity, acc_scale=velocity,
+                               planning_attempts=1, allowed_planning_time=2.0)
+        model_ready = _spin_until(node, lambda: all(
+            name in arm._limits and name in arm._pos_by_name for name in arm.joint_names), 5.0)
+        if not model_ready:
+            if not deadman():
+                result = {"outcome": "stopped", "detail": "模型尚未就绪时按住信号已释放，未发送目标"}
+                emit({"type": "jog-result", **result})
+                return 0
+            raise RuntimeError("缺少机器人限位或关节反馈")
+        if not deadman():
+            result = {"outcome": "stopped", "detail": "模型就绪前按住信号已释放，未发送目标"}
+            emit({"type": "jog-result", **result})
+            return 0
+        lo, hi = arm._limits[arm.joint_names[joint]]
+        if not all(math.isfinite(v) for v in (lo, hi)) or hi - lo <= 0.04:
+            raise ValueError("关节限位无效")
+
+        # Each goal is intentionally a small bounded increment: even if a
+        # controller's cancel response is delayed, it cannot keep travelling
+        # toward a distant joint limit. Never pipeline goals.
+        segment = 0.02
+        while deadman():
+            if not _spin_until(node, lambda: all(
+                    name in arm._pos_by_name for name in arm.joint_names), 1.0):
+                if not deadman():
+                    break
+                raise RuntimeError("关节反馈超时")
+            if not deadman():
+                break
+            current = validate_joints([arm._pos_by_name[n] for n in arm.joint_names],
+                                      joint_limits=arm._limits)
+            target = _bounded_jog_target(current[joint], (lo, hi), direction, segment)
+            if target is None:
+                return_code = {"outcome": "stopped", "detail": "已到关节限位附近，点动停止"}
+                break
+            current[joint] = target
+            goal = arm._goal_joint(current, False, planner="PTP")
+            sent = True
+            result = guarded_move_goal(node, arm._ac, goal, deadman,
+                                       motion_timeout=10.0, cancel_timeout=10.0)
+            if result["outcome"] == "completed":
+                continue
+            if result["outcome"] == "stopped":
+                return_code = result
+                break
+            # Uncertain means no more commands. Preserve the UI lockout.
+            return_code = result
+            break
+        else:
+            return_code = {"outcome": "stopped", "detail": "按住信号已释放"}
+        emit({"type": "jog-result", **return_code})
+        return 2 if return_code["outcome"] in ("uncertain", "failed", "rejected") else 0
+    except Exception as exc:
+        emit({"type": "jog-result", "outcome": "uncertain" if sent else "failed", "detail": str(exc)})
+        return 2
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
 def move_joints(values: list[float], velocity: float = 0.25,
                 backend: str = "simulation") -> int:
     """工作台受控的单次关节姿态运动。
@@ -376,6 +596,12 @@ def move_joints(values: list[float], velocity: float = 0.25,
         values = validate_joints(values)
         backend_impl = MoveGroupBackend(node, vel_scale=float(velocity), acc_scale=float(velocity),
                                    planning_attempts=2, allowed_planning_time=2.0)
+        # Do not silently fall back to missing model limits. The description is
+        # latched and arrives asynchronously after backend construction.
+        if not _spin_until(node, lambda: all(name in backend_impl._limits
+                                             for name in backend_impl.joint_names), 3.0):
+            raise RuntimeError("未收到完整机器人模型关节限位，拒绝移动")
+        values = validate_joints(values, joint_limits=backend_impl._limits)
         result = backend_impl.goto_joints(values)
         emit({"type": "pose-move", "success": bool(result.ok), "detail": str(result)})
         return 0 if result.ok else 2
@@ -439,12 +665,19 @@ def main(argv=None):
     pose.add_argument("--joints", nargs=6, type=float, required=True)
     pose.add_argument("--velocity", type=float, default=0.25)
     pose.add_argument("--backend", choices=("simulation",), default="simulation")
+    jog = sub.add_parser("continuous-jog")
+    jog.add_argument("--joint", type=int, required=True)
+    jog.add_argument("--direction", type=int, choices=(-1, 1), required=True)
+    jog.add_argument("--velocity", type=float, default=0.1)
+    jog.add_argument("--backend", choices=("simulation",), default="simulation")
     args = parser.parse_args(argv)
     try:
         if args.command == "monitor":
             return monitor(args.mode, camera=args.camera or args.recognition, recognition=args.recognition)
         if args.command == "service":
             return halt(args.timeout) if args.name == "halt" else service(args.name, args.timeout)
+        if args.command == "continuous-jog":
+            return continuous_jog(args.joint, args.direction, args.velocity, args.backend)
         if args.command == "move-joints":
             return move_joints(args.joints, args.velocity, args.backend)
         return reference(args.velocity, args.fixed_poses)

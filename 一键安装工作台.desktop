@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=一键安装基础组工作台
+Comment=在 Ubuntu 虚拟机中安装 ROS、Gazebo、工作台及桌面快捷方式
+Icon=system-software-install
+Terminal=true
+StartupNotify=false
+Categories=Education;
+Exec=/usr/bin/python3 -c "exec(\\"import runpy, sys\\\\nfrom pathlib import Path\\\\nfrom urllib.parse import urlsplit, unquote\\\\nstatus = 1\\\\ntry:\\\\n    value = sys.argv[1]\\\\n    uri = urlsplit(value)\\\\n    if value.startswith('file:'):\\\\n        if uri.netloc not in ('', 'localhost'):\\\\n            raise RuntimeError('请先将安装包复制到虚拟机本地目录。')\\\\n        location = Path(unquote(uri.path))\\\\n    else:\\\\n        location = Path(value)\\\\n    roots = (location.resolve().parent, Path.home() / 'jaka-student')\\\\n    script = next((root / 'setup/student_install_desktop.py' for root in roots\\\\n                   if (root / 'setup/student_install_desktop.py').is_file()), None)\\\\n    if script is None:\\\\n        raise RuntimeError('找不到安装包。请在 Ubuntu 内将安装包解压至主文件夹，确认 ~/jaka-student/setup 存在。不要只复制这个图标。')\\\\n    entry = runpy.run_path(str(script), run_name='jaka_desktop_entry')\\\\n    status = entry['install']()\\\\nexcept (Exception, KeyboardInterrupt) as exc:\\\\n    print('安装未完成：' + str(exc), flush=True)\\\\nif sys.stdin.isatty():\\\\n    try:\\\\n        input('\\\\\\\\n按回车关闭此窗口……')\\\\n    except (EOFError, KeyboardInterrupt):\\\\n        pass\\\\nsys.exit(status)\\\\n\\")" %k

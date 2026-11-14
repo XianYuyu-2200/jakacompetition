@@ -25,7 +25,21 @@ codex-competition/
 └── extras_linkerhand/      LinkerHand 灵巧手 ROS 2 SDK(末端执行器, 可选)
 ```
 
-## 快速开始
+## 学生虚拟机一键安装
+
+面向干净的 **Ubuntu 22.04 amd64 桌面虚拟机**，无需先装 ROS。
+
+推荐鼠标操作：在 Ubuntu 内将安装包解压到主文件夹（`~/jaka-student`），把包内「一键安装工作台.desktop」复制到桌面，右键「允许启动」后双击。它会自动打开安装终端，提示时输入 sudo 密码即可。
+
+也可使用终端：
+
+```bash
+bash setup/install-student.sh --install
+```
+
+联网安装官方软件源、ROS/Gazebo、相机/二维码/Qt 依赖，低并发编译并创建工作台快捷方式。教师用 `python3 setup/package-student.py` 生成分发包；操作说明见 `docs/学生工作台一键安装.md`。当前为联网安装候选包，不是离线包或已验收 OVA。
+
+## 快速开始（已有 ROS 的开发环境）
 
 ```bash
 bash setup/install-deps.sh           # 装依赖

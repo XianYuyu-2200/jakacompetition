@@ -135,8 +135,21 @@ bash setup/sim-clean.sh --all    # 再狠一点: 所有 ros2 / ign / rviz 进程
 ```bash
 bash setup/prepare-student-vm.sh --plan   # 默认仅输出计划，不安装
 # 仅教师在新建 Ubuntu 22.04 amd64 桌面虚拟机内显式执行：
-bash setup/prepare-student-vm.sh --apply  # 要求已安装 ROS Humble；需要 sudo 和网络
+bash setup/prepare-student-vm.sh --apply  # 自动安装 ROS Humble；需要 sudo 和网络
 bash setup/run-workbench.sh --vm-check > "$HOME/workbench-vm-preflight.json"
 ```
 
 VM 预检执行有超时的只读图形/版本查询，不启动仿真。通过只代表所查前置项未报错，不代表虚拟机、Gazebo 相机或真机验收通过。当前没有已验收 OVA，需要教师在实际学生电脑完成跨机导入与完整流程验收。不要直接复制本开发机的系统盘作为学生镜像。
+
+
+## 学生从干净虚拟机一键安装
+
+不必先手动安装 ROS。安装包新增「一键安装工作台.desktop」：解压到 `~/jaka-student` 后复制该图标到 Ubuntu 桌面，允许启动后双击，自动打开安装终端。必须在 Ubuntu 虚拟机内运行，不是 Windows 安装程序。
+
+备用命令：
+
+```bash
+bash setup/install-student.sh --install
+```
+
+默认不带参数只输出计划。脚本配置官方签名源、安装依赖、低并发编译、创建快捷方式并保存预检日志；不会启动仿真或真机。教师可用 `/usr/bin/python3 setup/package-student.py` 生成联网安装包和 SHA-256。完整操作见 `docs/学生工作台一键安装.md`。这不是离线包或已验收 OVA。

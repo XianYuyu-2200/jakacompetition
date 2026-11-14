@@ -110,6 +110,7 @@ class DistributionTests(unittest.TestCase):
         self.assertTrue(entry.stat().st_mode & 0o111)
         self.assertIn("Terminal=false", entry.read_text())
         self.assertIn("Name=基础组学习工作台", entry.read_text())
+        self.assertIn("StartupWMClass=jaka-competition-workbench", entry.read_text())
         self.assertEqual(self.install().read_bytes(), first)
         self.assertFalse(self.capture.exists())
 

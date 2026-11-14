@@ -373,3 +373,239 @@ class ReadinessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_joint_units_preserve_radian_values_and_record():
+    import math
+    import yaml
+    from tempfile import TemporaryDirectory
+    app = QApplication.instance() or QApplication([])
+    root = Path(__file__).resolve().parents[2]
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(root, Path(directory), demo=True)
+        try:
+            w.joint_spins[0].setValue(1.2345)
+            w.joint_unit.setCurrentIndex(1)
+            assert abs(w.joint_spins[0].value() - math.degrees(1.2345)) < 1e-7
+            w._record_pose()
+            data = yaml.safe_load(w._pose_path().read_text())
+            assert abs(data['objects']['1']['approach_joints'][0] - 1.2345) < 1e-8
+            w.joint_unit.setCurrentIndex(0)
+            assert abs(w.joint_spins[0].value() - 1.2345) < 1e-8
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_jog_is_single_step_and_rejects_stale_or_busy():
+    import math
+    import time
+    from tempfile import TemporaryDirectory
+    app = QApplication.instance() or QApplication([])
+    root = Path(__file__).resolve().parents[2]
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(root, Path(directory), demo=True)
+        try:
+            w.demo = False
+            w.ready = True
+            w.joint_positions = {f'joint_{i}': 0.0 for i in range(1, 7)}
+            w.joint_positions['joint_2'] = -1e-16
+            with patch.object(w, '_has_stack', return_value=True), \
+                 patch.object(w, '_runner_active', return_value=False), \
+                 patch.object(w.manager, 'alive', return_value=False), \
+                 patch.object(w.manager, 'launch') as launch, \
+                 patch.object(w, '_bridge', side_effect=lambda *a: a):
+                w.joint_sample_at = time.monotonic() - 5
+                w._jog_once(0, 1)
+                launch.assert_not_called()
+                w.joint_sample_at = time.monotonic()
+                w.jog_step.setCurrentIndex(2)
+                w._jog_once(0, -1)
+                args = launch.call_args.args[1]
+                from workbench.ros_bridge import main
+                with patch('workbench.ros_bridge.move_joints', return_value=0) as move:
+                    assert main(list(args)) == 0
+                    assert len(move.call_args.args[0]) == 6
+                assert abs(float(args[args.index('--joints') + 1]) + math.radians(3)) < 1e-12
+                w._jog_once(0, -1)
+                assert launch.call_count == 1
+                w.joint_sample_at = time.monotonic()
+                w.run_state = 'running'
+                w._jog_once(0, 1)
+                assert launch.call_count == 1
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_pose_motion_interlocks_round_and_other_services():
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        try:
+            w.start_environment()
+            w.generate()
+            w._pose_inflight = True
+            w._update_buttons()
+            assert not w.reference_button.isEnabled()
+            assert not w.generate_button.isEnabled()
+            assert not w.reset_button.isEnabled()
+            with patch.object(w, '_demo_service') as service:
+                w.run_reference()
+                w.start_round()
+                w.generate()
+                w.reset_scene()
+                service.assert_not_called()
+            assert w.run_state == 'armed'
+        finally:
+            w._pose_inflight = False
+            w.shutdown()
+            w.close()
+
+
+def test_pose_feedback_must_be_fresh_and_complete():
+    import time
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        try:
+            w.joint_positions = {f'joint_{i}': .5 for i in range(1, 7)}
+            w.joint_sample_at = time.monotonic() - 5
+            w._read_current_joints()
+            assert w.joint_spins[0].value() == 0
+            assert '过期' in w.pose_status.text()
+            w.joint_sample_at = time.monotonic()
+            w._read_current_joints()
+            assert w.joint_spins[0].value() == .5
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_continuous_jog_press_release_and_uncertain_locks_out():
+    import time
+    from PyQt5.QtCore import QEvent
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        try:
+            w.demo = False
+            w.ready = True
+            w.jog_mode.setCurrentIndex(1)
+            w.joint_positions = {f'joint_{i}': 0.0 for i in range(1, 7)}
+            # The monitor emits status at 1 Hz; a sample can legitimately be
+            # over 1 second old between reports while still within its 4 s TTL.
+            w.joint_sample_at = time.monotonic() - 2
+            with patch.object(w, '_has_stack', return_value=True), \
+                 patch.object(w, '_runner_active', return_value=False), \
+                 patch.object(w.manager, 'alive', return_value=False), \
+                 patch.object(w.manager, 'launch') as launch, \
+                 patch.object(w.manager, 'write_input', return_value=True) as heartbeat, \
+                 patch.object(w.manager, 'close_input') as close, \
+                 patch.object(w, '_bridge', side_effect=lambda *a: a), \
+                 patch.object(w, '_refresh_gazebo_view'):
+                w._press_jog(2, -1, w.jog_buttons[4])
+                assert launch.call_args.kwargs['input_pipe']
+                assert 'continuous-jog' in launch.call_args.args[1]
+                assert heartbeat.call_args.args[1].startswith(b'H')
+                heartbeat.reset_mock()
+                w._tick()
+                assert w._jog_held is w.jog_buttons[4]
+                assert heartbeat.call_count == 1
+                w.eventFilter(w.jog_buttons[4], QEvent(QEvent.Leave))
+                close.assert_called_once_with('pose')
+                assert w._jog_held is None
+                w._handle_protocol('pose', {'type': 'jog-result', 'outcome': 'uncertain', 'detail': 'timeout'})
+                assert w._pose_busy()
+                w._pose_inflight = False
+                assert w._pose_busy()
+                w._press_jog(2, 1, w.jog_buttons[5])
+                assert launch.call_count == 1
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_continuous_jog_window_deactivation_closes_deadman():
+    from PyQt5.QtCore import QEvent
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        try:
+            with patch.object(w.manager, 'close_input') as close:
+                w._jog_held = w.jog_buttons[0]
+                w.event(QEvent(QEvent.WindowDeactivate))
+                close.assert_called_once_with('pose')
+                assert w._jog_held is None
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_continuous_jog_mouse_hold_survives_monitor_interval_and_stops_on_release():
+    import time
+    from PyQt5.QtCore import Qt
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        w.timer.stop()
+        try:
+            w.demo = False
+            w.ready = True
+            w.jog_mode.setCurrentIndex(1)
+            w.joint_positions = {f'joint_{i}': 0.0 for i in range(1, 7)}
+            w.joint_sample_at = time.monotonic() - 1.2
+            with patch.object(w, '_has_stack', return_value=True), \
+                 patch.object(w, '_runner_active', return_value=False), \
+                 patch.object(w.manager, 'alive', return_value=False), \
+                 patch.object(w.manager, 'launch') as launch, \
+                 patch.object(w.manager, 'write_input', return_value=True), \
+                 patch.object(w.manager, 'close_input') as close, \
+                 patch.object(w, '_bridge', side_effect=lambda *a: a), \
+                 patch.object(w, '_refresh_gazebo_view'):
+                button = w.jog_buttons[1]
+                QTest.mousePress(button, Qt.LeftButton)
+                w._tick()
+                assert w._jog_held is button
+                launch.assert_called_once()
+                close.assert_not_called()
+                QTest.mouseRelease(button, Qt.LeftButton)
+                assert w._jog_held is None
+                close.assert_called_once_with('pose')
+        finally:
+            w.shutdown()
+            w.close()
+
+
+def test_continuous_jog_stale_feedback_stops_heartbeat_and_rejects_start():
+    import time
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        w = WorkbenchWindow(Path(__file__).resolve().parents[2], Path(directory), demo=True)
+        w.timer.stop()
+        try:
+            w.demo = False
+            w.ready = True
+            w.jog_mode.setCurrentIndex(1)
+            w.joint_positions = {f'joint_{i}': 0.0 for i in range(1, 7)}
+            w.joint_sample_at = time.monotonic() - 5
+            with patch.object(w, '_has_stack', return_value=True), \
+                 patch.object(w, '_runner_active', return_value=False), \
+                 patch.object(w.manager, 'alive', return_value=False), \
+                 patch.object(w.manager, 'launch') as launch, \
+                 patch.object(w.manager, 'write_input') as heartbeat, \
+                 patch.object(w.manager, 'close_input') as close, \
+                 patch.object(w, '_refresh_gazebo_view'):
+                w._press_jog(0, 1, w.jog_buttons[1])
+                launch.assert_not_called()
+                assert '过期' in w.pose_status.text()
+                w._jog_held = w.jog_buttons[1]
+                w._tick()
+                assert w._jog_held is None
+                heartbeat.assert_not_called()
+                close.assert_called_once_with('pose')
+        finally:
+            w.shutdown()
+            w.close()

@@ -92,3 +92,10 @@ perception/track1_sim/pose_daemon
 # 预览节点写出的图，不进仓库。
 design/gemini305_preview/
 design/track1_recognize/
+
+# 学生安装交付：源码文档入库，生成的分发文件留在本机。
+!docs/学生工作台一键安装.md
+dist/
+
+# 工作台界面改版的设计与验收说明。
+!docs/工作台界面改版与验收.md

@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-14",
+  "scope": "Native Ubuntu developer machine only; no system package installation, no robot/simulation launch",
+  "artifact": "dist/jaka-student-20261114-candidate.tar.gz",
+  "artifact_bytes": 34367028,
+  "artifact_sha256": "42df093bbc91d018835e6b339d939b0807bbec1e05967cf2d85fc07544e4e99d",
+  "archive_manifest_files_verified": 1144,
+  "archive_relative_symlinks_verified": true,
+  "extracted_source_build": {
+    "status": "passed",
+    "packages": 32,
+    "duration": "1min 26s",
+    "warning": "serial package emitted compiler warnings"
+  },
+  "extracted_source_check": "passed",
+  "extracted_shortcut_install_in_temporary_home": "passed",
+  "tests": {
+    "passed": 1113,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 17.5,
+    "command": "source /opt/ros/humble/setup.bash; source jaka_ros2/install/setup.bash; PYTHONPATH=\"$PWD:$PWD/jaka_competition_kit:$PYTHONPATH\" /usr/bin/python3 -m pytest -q workbench/test jaka_competition_kit/test setup/test",
+    "initial_attempt": "Without sourcing ROS, collection failed on missing rclpy; rerun with required ROS environment passed."
+  },
+  "apt_dependency_solver": "--simulate passed against existing host package indexes; no packages installed",
+  "official_source_download_checks": {
+    "ros2_apt_source_version": "1.3.0",
+    "deb_sha256": "verified against pinned hash",
+    "gazebo_primary_key_fingerprint": "D2486D2DD83DB69272AFE98867170598AF249743"
+  },
+  "clean_vm_installation": "not_run",
+  "student_vm_acceptance": "not_run",
+  "hardware_acceptance": "not_run",
+  "ova_created": false,
+  "offline_dependencies_included": false
+}

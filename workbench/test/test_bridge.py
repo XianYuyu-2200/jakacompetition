@@ -75,3 +75,168 @@ class ReferenceOutcomeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_pose_move_requires_complete_model_limits():
+    from workbench.ros_bridge import move_joints
+    node = SimpleNamespace(destroy_node=Mock())
+    backend = SimpleNamespace(joint_names=[f'joint_{i}' for i in range(1, 7)],
+                              _limits={}, goto_joints=Mock())
+    with patch('rclpy.init'), patch('rclpy.shutdown'), \
+         patch('rclpy.create_node', return_value=node), \
+         patch('jaka_competition_kit.backend.MoveGroupBackend', return_value=backend), \
+         patch('workbench.ros_bridge._spin_until', return_value=False), \
+         patch('workbench.ros_bridge.emit') as emit:
+        assert move_joints([0.0] * 6) == 2
+        backend.goto_joints.assert_not_called()
+        assert '限位' in emit.call_args.args[0]['detail']
+
+
+def test_pose_move_rejects_target_outside_actual_model_limits():
+    from workbench.ros_bridge import move_joints
+    node = SimpleNamespace(destroy_node=Mock())
+    backend = SimpleNamespace(joint_names=[f'joint_{i}' for i in range(1, 7)],
+                              _limits={f'joint_{i}': (-1, 1) for i in range(1, 7)},
+                              goto_joints=Mock())
+    with patch('rclpy.init'), patch('rclpy.shutdown'), \
+         patch('rclpy.create_node', return_value=node), \
+         patch('jaka_competition_kit.backend.MoveGroupBackend', return_value=backend), \
+         patch('workbench.ros_bridge._spin_until', return_value=True), \
+         patch('workbench.ros_bridge.emit'):
+        assert move_joints([0, 2, 0, 0, 0, 0]) == 2
+        backend.goto_joints.assert_not_called()
+
+
+def test_guarded_goal_release_before_acceptance_cancels_owned_goal():
+    from workbench.ros_bridge import guarded_move_goal
+    result = Mock()
+    result.done.side_effect = [False, True]
+    result.result.return_value = SimpleNamespace(status=5)
+    cancel = Mock()
+    cancel.done.return_value = True
+    cancel.result.return_value = SimpleNamespace(goals_canceling=[1])
+    handle = SimpleNamespace(accepted=True, get_result_async=Mock(return_value=result),
+                             cancel_goal_async=Mock(return_value=cancel))
+    pending = Mock()
+    pending.done.side_effect = [False, True]
+    pending.result.return_value = handle
+    action = SimpleNamespace(send_goal_async=Mock(return_value=pending))
+    deadman = Mock(side_effect=[True, False])
+    with patch('rclpy.ok', return_value=True), patch('rclpy.spin_once'):
+        answer = guarded_move_goal(object(), action, object(), deadman)
+    assert answer['outcome'] == 'stopped'
+    handle.cancel_goal_async.assert_called_once()
+    action.send_goal_async.assert_called_once()
+
+
+def test_guarded_goal_cancel_ack_is_not_terminal_confirmation():
+    from workbench.ros_bridge import guarded_move_goal
+    result = Mock()
+    result.done.return_value = False
+    cancel = Mock()
+    cancel.done.return_value = True
+    cancel.result.return_value = SimpleNamespace(goals_canceling=[1])
+    handle = SimpleNamespace(accepted=True, get_result_async=Mock(return_value=result),
+                             cancel_goal_async=Mock(return_value=cancel))
+    pending = Mock()
+    pending.done.return_value = True
+    pending.result.return_value = handle
+    action = SimpleNamespace(send_goal_async=Mock(return_value=pending))
+    with patch('rclpy.ok', return_value=True), patch('rclpy.spin_once'):
+        answer = guarded_move_goal(object(), action, object(),
+                                   Mock(side_effect=[True, False]), cancel_timeout=0)
+    assert answer['outcome'] == 'uncertain'
+    handle.cancel_goal_async.assert_called_once()
+
+
+def test_guarded_goal_never_sends_if_deadman_absent():
+    from workbench.ros_bridge import guarded_move_goal
+    action = SimpleNamespace(send_goal_async=Mock())
+    assert guarded_move_goal(object(), action, object(), lambda: False)['outcome'] == 'stopped'
+    action.send_goal_async.assert_not_called()
+
+
+def test_guarded_goal_late_acceptance_timeout_is_uncertain():
+    from workbench.ros_bridge import guarded_move_goal
+    pending = Mock()
+    pending.done.return_value = False
+    action = SimpleNamespace(send_goal_async=Mock(return_value=pending))
+    with patch('rclpy.ok', return_value=True):
+        answer = guarded_move_goal(object(), action, object(), lambda: True, accept_timeout=0)
+    assert answer['outcome'] == 'uncertain'
+
+
+def test_pipe_deadman_expires_stale_buffer_and_eof():
+    import os
+    import time
+    from workbench.ros_bridge import PipeDeadman
+    read, write = os.pipe()
+    try:
+        deadman = PipeDeadman(read, timeout=0.1)
+        os.write(write, f'H{time.monotonic() - 1:.9f}\n'.encode())
+        assert not deadman()
+    finally:
+        os.close(read)
+        os.close(write)
+    read, write = os.pipe()
+    try:
+        deadman = PipeDeadman(read)
+        os.write(write, f'H{time.monotonic():.9f}\n'.encode())
+        assert deadman()
+        os.close(write)
+        write = -1
+        assert not deadman()
+    finally:
+        os.close(read)
+        if write != -1:
+            os.close(write)
+
+
+def test_guarded_goal_success_status_requires_moveit_success():
+    from workbench.ros_bridge import guarded_move_goal
+    result = Mock()
+    result.done.return_value = True
+    result.result.return_value = SimpleNamespace(status=4, result=SimpleNamespace(error_code=SimpleNamespace(val=-1)))
+    handle = SimpleNamespace(accepted=True, get_result_async=Mock(return_value=result))
+    pending = Mock()
+    pending.done.return_value = True
+    pending.result.return_value = handle
+    action = SimpleNamespace(send_goal_async=Mock(return_value=pending))
+    assert guarded_move_goal(object(), action, object(), lambda: True)['outcome'] == 'failed'
+
+
+def test_continuous_jog_targets_are_small_and_respect_limits():
+    from workbench.ros_bridge import _bounded_jog_target
+    assert _bounded_jog_target(0.0, (-2.0, 2.0), 1) == 0.02
+    assert _bounded_jog_target(0.0, (-2.0, 2.0), -1) == -0.02
+    assert _bounded_jog_target(1.975, (-2.0, 2.0), 1) == 1.98
+    assert _bounded_jog_target(1.98, (-2.0, 2.0), 1) is None
+    assert _bounded_jog_target(-1.98, (-2.0, 2.0), -1) is None
+
+
+def test_continuous_jog_rejects_invalid_segment_configuration():
+    import pytest
+    from workbench.ros_bridge import _bounded_jog_target
+    with pytest.raises(ValueError):
+        _bounded_jog_target(0.0, (-1.0, 1.0), 1, segment=float('inf'))
+
+
+def test_guarded_goal_cancel_rejection_waits_for_racing_terminal_result():
+    from workbench.ros_bridge import guarded_move_goal
+    result = Mock()
+    result.done.side_effect = [False, False, True]
+    result.result.return_value = SimpleNamespace(
+        status=4, result=SimpleNamespace(error_code=SimpleNamespace(val=1)))
+    cancel = Mock()
+    cancel.done.return_value = True
+    cancel.result.return_value = SimpleNamespace(goals_canceling=[])
+    handle = SimpleNamespace(accepted=True, get_result_async=Mock(return_value=result),
+                             cancel_goal_async=Mock(return_value=cancel))
+    pending = Mock()
+    pending.done.return_value = True
+    pending.result.return_value = handle
+    action = SimpleNamespace(send_goal_async=Mock(return_value=pending))
+    deadman = Mock(side_effect=[True, False, False, False])
+    with patch('rclpy.ok', return_value=True), patch('rclpy.spin_once'):
+        answer = guarded_move_goal(object(), action, object(), deadman)
+    assert answer['outcome'] == 'completed'

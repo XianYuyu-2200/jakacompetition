@@ -44,9 +44,14 @@ def main(argv=None) -> int:
     except ImportError as exc:
         print(f"工作台界面依赖未就绪：{exc}\n可安装 python3-pyqt5 后重试。", file=sys.stderr)
         return 2
-    # 只传程序名，避免 Qt 误处理工作台参数。
-    app = QApplication([sys.argv[0]])
-    app.setApplicationName("基础组学习工作台")
+    # X11 WM_CLASS is a legacy STRING, not UTF8_STRING. Keep both its
+    # instance (argv[0]) and class (applicationName) ASCII; use the Unicode
+    # display name and matching desktop entry for the user-facing Chinese name.
+    # Do not pass workbench CLI options through to Qt.
+    app = QApplication(["jaka-competition-workbench"])
+    app.setApplicationName("jaka-competition-workbench")
+    app.setApplicationDisplayName("基础组学习工作台")
+    app.setDesktopFileName("jaka-competition-workbench")
     app.setOrganizationName("JAKACompetitionLearning")
     window = WorkbenchWindow(root, args.data_dir.expanduser().resolve(),
                              demo=args.demo, mode=args.mode)

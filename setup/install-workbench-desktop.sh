@@ -72,6 +72,7 @@ def main():
         "Terminal=false\n"
         "Categories=Education;Science;\n"
         "StartupNotify=true\n"
+        "StartupWMClass=jaka-competition-workbench\n"
         f"{MARKER}\n"
     )
     install(applications / NAME, content)
