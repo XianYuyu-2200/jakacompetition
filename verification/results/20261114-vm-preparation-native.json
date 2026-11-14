@@ -1,0 +1,163 @@
+{
+  "scope": "VM preparation tools tested on native Ubuntu; not VM acceptance",
+  "vm_image_created": false,
+  "student_vm_acceptance": "not_run",
+  "provisioning_apply_executed": false,
+  "native_preflight": {
+    "scope": "read-only teaching VM preflight; no robot commands",
+    "simulation_acceptance": "not_run",
+    "hardware_acceptance": "not_run",
+    "checks": [
+      {
+        "name": "教学镜像系统",
+        "level": "ok",
+        "detail": "Ubuntu 22.04.5 LTS；当前教学镜像目标固定为 Ubuntu 22.04"
+      },
+      {
+        "name": "教学镜像架构",
+        "level": "ok",
+        "detail": "x86_64；本交付候选仅面向 amd64，不代表 ARM 已验收"
+      },
+      {
+        "name": "可见逻辑 CPU",
+        "level": "ok",
+        "detail": "16；4 vCPU 是测试起点，不是已测最低配置"
+      },
+      {
+        "name": "客体内存",
+        "level": "ok",
+        "detail": "46.8 GiB；建议起点 8GB，运行性能仍需验收"
+      },
+      {
+        "name": "工程所在磁盘剩余空间",
+        "level": "warning",
+        "detail": "12.7 GiB；低于 20GiB 时先检查编译和日志空间，不自动清理"
+      },
+      {
+        "name": "虚拟化检测",
+        "level": "warning",
+        "detail": "none；不代替宿主机型号与虚拟机版本记录"
+      },
+      {
+        "name": "X11 图形会话",
+        "level": "ok",
+        "detail": "已设置 DISPLAY；下面单独检查连接"
+      },
+      {
+        "name": "OpenGL 实际上下文",
+        "level": "ok",
+        "detail": "OpenGL 4.6；版本不证明 Ogre 扩展或相机渲染可用"
+      },
+      {
+        "name": "教学 Python 依赖 numpy",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      },
+      {
+        "name": "教学 Python 依赖 cv2",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      },
+      {
+        "name": "教学 Python 依赖 yaml",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      },
+      {
+        "name": "教学 Python 依赖 qrcode",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      },
+      {
+        "name": "教学 Python 依赖 pyzbar",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      },
+      {
+        "name": "教学 Python 依赖 PIL",
+        "level": "ok",
+        "detail": "可发现模块；实际二维码解码仍需回放验证"
+      }
+    ],
+    "probes": {
+      "virtualization": {
+        "command": [
+          "/usr/bin/systemd-detect-virt"
+        ],
+        "returncode": 1,
+        "stdout": "none\n",
+        "stderr": ""
+      },
+      "opengl": {
+        "command": [
+          "/usr/bin/glxinfo",
+          "-B"
+        ],
+        "returncode": 0,
+        "stdout": "name of display: :1\ndisplay: :1  screen: 0\ndirect rendering: Yes\nMemory info (GL_NVX_gpu_memory_info):\n    Dedicated video memory: 16311 MB\n    Total available memory: 16311 MB\n    Currently available dedicated video memory: 14582 MB\nOpenGL vendor string: NVIDIA Corporation\nOpenGL renderer string: NVIDIA GeForce RTX 5060 Ti/PCIe/SSE2\nOpenGL core profile version string: 4.6.0 NVIDIA 580.178.04\nOpenGL core profile shading language version string: 4.60 NVIDIA\nOpenGL core profile context flags: (none)\nOpenGL core profile profile mask: core profile\n\nOpenGL version string: 4.6.0 NVIDIA 580.178.04\nOpenGL shading language version string: 4.60 NVIDIA\nOpenGL context flags: (none)\nOpenGL profile mask: (none)\n\nOpenGL ES profile version string: OpenGL ES 3.2 NVIDIA 580.178.04\nOpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20\n\n",
+        "stderr": ""
+      },
+      "packages": {
+        "command": [
+          "/usr/bin/dpkg-query",
+          "-W",
+          "-f=${binary:Package}\t${Version}\n",
+          "ros-humble-ros-base",
+          "ros-humble-ros-gz",
+          "ignition-fortress",
+          "python3-pyqt5",
+          "python3-pyzbar",
+          "python3-qrcode",
+          "mesa-utils"
+        ],
+        "returncode": 0,
+        "stdout": "ignition-fortress\t1.0.3-2~jammy\nmesa-utils\t8.4.0-1ubuntu1\npython3-pyqt5\t5.15.6+dfsg-1ubuntu3\npython3-pyzbar\t0.1.8-3.1\npython3-qrcode\t7.3.1-1\nros-humble-ros-base\t0.10.0-1jammy.20260804.204550\nros-humble-ros-gz\t0.244.26-1jammy.20260908.015605\n",
+        "stderr": ""
+      },
+      "revision": {
+        "command": [
+          "/usr/bin/git",
+          "-C",
+          "/home/ktz/codex/codex-competition",
+          "rev-parse",
+          "HEAD"
+        ],
+        "returncode": 0,
+        "stdout": "56c13b1cbc7a81a0c5dbc281eaf42fcc218a8493\n",
+        "stderr": ""
+      },
+      "worktree": {
+        "command": [
+          "/usr/bin/git",
+          "-C",
+          "/home/ktz/codex/codex-competition",
+          "status",
+          "--porcelain",
+          "--untracked-files=no"
+        ],
+        "returncode": 0,
+        "stdout": " M setup/install-deps.sh\n M setup/run-workbench.sh\n M workbench/__main__.py\n M workbench/test/test_distribution.py\n",
+        "stderr": ""
+      }
+    }
+  },
+  "software_tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "1083",
+    "time": "17.109",
+    "timestamp": "2026-11-14T11:19:36.844535",
+    "hostname": "ktz"
+  },
+  "source_sha256": {
+    "workbench/vm_check.py": "834ab0c17f41ee62e11bc95dbf97af24e4aa59a8cc83d97dce4390acf0388699",
+    "workbench/__main__.py": "7ce1e7a2717dfeab00d35582dd702b611f03d341203a37eabe1aa40e4116be04",
+    "setup/run-workbench.sh": "fb37001ff1f9fa6096b031af48841262ad5db9d6d16e9b9359cc0e10ed93c9fe",
+    "setup/prepare-student-vm.sh": "6e53a7a3bc01c7ed9c338f5b7db46cae7414b1082cc672001681c6b68a917a53",
+    "setup/install-deps.sh": "e3f9e6ff8ef7083eef55c170578170b8f8ca909f273f1de21d4407840db03b09",
+    "workbench/test/test_vm_check.py": "0e76d97b3f0fd4898da6dfc0a9392b91fb272b8c77735bb04d2c6f807b20e4ac",
+    "workbench/test/test_distribution.py": "e9b85605fe7c3f33c21e63ca402c4b6f03ce6f9645a1416603c0d10d7cf7e01a"
+  }
+}

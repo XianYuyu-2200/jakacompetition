@@ -84,7 +84,7 @@ class DistributionTests(unittest.TestCase):
 
     def test_check_and_help_do_not_require_qt(self):
         self.env.update(WORKBENCH_PYTHON=str(self.python), WB_NO_QT="1")
-        for option in ("--check", "--help"):
+        for option in ("--check", "--vm-check", "--help"):
             result = self.invoke("run-workbench.sh", option)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(self.capture.read_text())["args"],

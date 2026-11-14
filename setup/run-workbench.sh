@@ -13,7 +13,7 @@ fi
 # --check must remain usable without Qt or a graphical session.
 CHECK_ONLY=false
 for arg in "$@"; do
-  case "$arg" in --check|--help|-h) CHECK_ONLY=true ;; esac
+  case "$arg" in --check|--vm-check|--help|-h) CHECK_ONLY=true ;; esac
 done
 if [[ "$CHECK_ONLY" != true ]] && ! "$PYTHON" -c 'from PyQt5 import QtCore, QtWidgets' >/dev/null 2>&1; then
   printf '%s\n' \

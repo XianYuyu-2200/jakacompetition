@@ -127,3 +127,16 @@ bash setup/sim-clean.sh --all    # 再狠一点: 所有 ros2 / ign / rviz 进程
 
 `round.launch.py` 现在带**启动前检查**: 撞上还在跑的仿真直接报错并提示上面这条
 命令; 确实要两套并存(对照调试)加 `allow_concurrent:=true`。
+
+## 教学虚拟机交付候选
+
+先阅读 `docs/教学虚拟机制作与验收.md`；学生操作见 `docs/学生虚拟机入门与验收.md`。
+
+```bash
+bash setup/prepare-student-vm.sh --plan   # 默认仅输出计划，不安装
+# 仅教师在新建 Ubuntu 22.04 amd64 桌面虚拟机内显式执行：
+bash setup/prepare-student-vm.sh --apply  # 要求已安装 ROS Humble；需要 sudo 和网络
+bash setup/run-workbench.sh --vm-check > "$HOME/workbench-vm-preflight.json"
+```
+
+VM 预检执行有超时的只读图形/版本查询，不启动仿真。通过只代表所查前置项未报错，不代表虚拟机、Gazebo 相机或真机验收通过。当前没有已验收 OVA，需要教师在实际学生电脑完成跨机导入与完整流程验收。不要直接复制本开发机的系统盘作为学生镜像。

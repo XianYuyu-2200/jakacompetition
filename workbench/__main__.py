@@ -15,6 +15,7 @@ def main(argv=None) -> int:
     parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get(
         "XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "jaka-workbench")
     parser.add_argument("--check", action="store_true", help="输出 JSON 环境检查，不启动界面")
+    parser.add_argument("--vm-check", action="store_true", help="只读教学虚拟机检查（含 OpenGL 探测），输出 JSON，不启动仿真")
     parser.add_argument("--mode", choices=("basic", "recognition", "vision"), default="basic")
     args = parser.parse_args(argv)
     from .runtime import check_environment, discover_root, simulation_conflicts
@@ -23,10 +24,15 @@ def main(argv=None) -> int:
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    if args.check:
+    if args.check or args.vm_check:
         checks = check_environment(root, args.mode)
-        print(json.dumps({"root": str(root), "mode": args.mode, "checks": checks,
-                          "conflicts": simulation_conflicts()}, ensure_ascii=False, indent=2))
+        report = {"root": str(root), "mode": args.mode, "checks": checks,
+                  "conflicts": simulation_conflicts()}
+        if args.vm_check:
+            from .vm_check import collect_vm_report
+            report["vm"] = collect_vm_report(root)
+            checks.extend(report["vm"]["checks"])
+        print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1 if any(c["level"] == "error" for c in checks) else 0
     if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
                                or os.environ.get("QT_QPA_PLATFORM")):

@@ -12,6 +12,19 @@ fi
 ${SUDO} apt-get update
 
 ${SUDO} apt-get install -y \
+  python3-colcon-common-extensions \
+  python3-pyqt5 \
+  python3-yaml \
+  python3-numpy \
+  python3-opencv \
+  python3-qrcode \
+  python3-pyzbar \
+  python3-pil \
+  python3-pytest \
+  libzbar0 \
+  mesa-utils \
+  x11-utils \
+  ros-humble-cv-bridge \
   ros-humble-xacro \
   ros-humble-joint-state-publisher \
   ros-humble-joint-state-publisher-gui \
