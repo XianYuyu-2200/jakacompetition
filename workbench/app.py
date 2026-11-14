@@ -454,6 +454,10 @@ class WorkbenchWindow(QMainWindow):
         self.waypoint_status = _label("中间路点按顺序在所选阶段前执行；抓取后转场在抬升后执行。", "muted")
         waypoint_buttons.addWidget(self.waypoint_status, 1)
         pose_layout.addLayout(waypoint_buttons)
+        example_buttons = QHBoxLayout()
+        example_buttons.addWidget(_button("载入仿真基础姿态", self._load_simulation_example))
+        example_buttons.addWidget(_label("仅默认仿真布局；覆盖前备份。不能用于真机。", "muted"), 1)
+        pose_layout.addLayout(example_buttons)
         self.pose_file_label = _label(f"配置：{self._pose_path()}", "muted")
         pose_layout.addWidget(self.pose_file_label)
         layout.addWidget(pose_card)
@@ -1253,6 +1257,9 @@ class WorkbenchWindow(QMainWindow):
         self.pose_status.setText("已读取当前机械臂姿态。")
 
     def _move_to_pose(self):
+        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+            self.pose_status.setText("本轮或姿态运动正在执行；请先停止，不能并发发送姿态运动。")
+            return
         values = [spin.value() for spin in self.joint_spins]
         if self.demo:
             self.pose_status.setText("演示模式不移动真实/仿真机械臂。")
@@ -1289,6 +1296,32 @@ class WorkbenchWindow(QMainWindow):
         except (OSError, ValueError, yaml.YAMLError) as exc:
             self.pose_status.setText(f"保存失败：{exc}")
 
+
+    def _load_simulation_example(self):
+        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+            self.pose_status.setText("请先停止本轮和姿态运动，再载入仿真基础姿态。")
+            return
+        if QMessageBox.question(
+                self, "载入仿真基础姿态",
+                "此示例仅适用于默认基础组场景和仿真夹爪。\n"
+                "它使用规划场景附着，不代表物理接触抓取或真机标定。\n"
+                "将备份当前姿态并启用示例供下一轮仿真回放；不会立即移动机械臂。继续？",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+            return
+        # Modal dialogs process Qt events: a program can start while the
+        # confirmation is open, so recheck before replacing any configuration.
+        if self._runner_active() or self.run_state == "running" or self.manager.alive("pose"):
+            self.pose_status.setText("确认期间已开始运行，未替换姿态配置；请先停止。")
+            return
+        try:
+            source = self._pose_template_path().with_name("track1_simulation_example.yaml")
+            _, backup = self._fixed_pose_api().import_simulation_poses(
+                str(source), str(self._pose_path()), enable=True)
+            self._load_saved_pose_into_editor()
+            self.pose_status.setText("仿真基础姿态已启用；未移动机械臂，下一轮仍需完整回放验收。")
+            self._log(f"载入仿真基础姿态：{self._pose_path()}；原配置备份：{backup}")
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            self.pose_status.setText(f"仿真基础姿态载入失败：{exc}")
 
     def _append_waypoint(self):
         self._edit_waypoints(clear=False)

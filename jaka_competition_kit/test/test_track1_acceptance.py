@@ -52,6 +52,7 @@ def test_fixed_failure_stops_without_retry_or_next_station(monkeypatch):
     reference.ReferenceBase.run(node)
     assert calls == [4]
     assert node.done
+    assert not node.succeeded
     assert any('本轮停止' in message for _, message in logger.messages)
 
 
@@ -147,3 +148,43 @@ def test_station_transfer_failure_stops_before_place():
                           release=lambda *a: releases.append(True), last_failure='')
     assert not Executor.fixed_pick_and_place(arm, obj, None, poses)
     assert calls == [1, 2, 3, 4] and arm.last_failure == 'motion' and not releases
+
+
+@pytest.mark.parametrize('success', [False, True])
+def test_cli_exit_status_reports_failure_and_cleans_up(monkeypatch, success):
+    from unittest.mock import Mock
+    node = SimpleNamespace(run=Mock(), done=True, succeeded=success,
+                           scene_cli=SimpleNamespace(close=Mock()), destroy_node=Mock())
+    shutdown = Mock()
+    monkeypatch.setattr(reference.rclpy, 'try_shutdown', shutdown)
+    assert reference.spin(node) == (0 if success else 2)
+    node.scene_cli.close.assert_called_once()
+    node.destroy_node.assert_called_once()
+    shutdown.assert_called_once()
+
+
+def test_cli_interrupt_is_not_success(monkeypatch):
+    from unittest.mock import Mock
+    node = SimpleNamespace(run=Mock(side_effect=KeyboardInterrupt),
+                           scene_cli=SimpleNamespace(close=Mock()), destroy_node=Mock())
+    monkeypatch.setattr(reference.rclpy, 'try_shutdown', Mock())
+    assert reference.spin(node) == 130
+    node.destroy_node.assert_called_once()
+
+
+@pytest.mark.parametrize('track,fixed_ready', [(1, False), (2, False), (2, True)])
+def test_verify_only_never_falls_back_to_executing_motion(monkeypatch, track, fixed_ready):
+    from unittest.mock import Mock
+    monkeypatch.setattr(reference, 'is_complete', lambda *a, **kw: fixed_ready)
+    arm = SimpleNamespace(pick_and_place=Mock(), fixed_pick_and_place=Mock())
+    node = SimpleNamespace(get_logger=lambda: Logger(), wait_for_scene=lambda: True,
+                           wait_for_state=Mock(), get_parameter=lambda _: SimpleNamespace(value=True),
+                           plan_order=lambda: [{'station': 1, 'xy': [0., 0.]}],
+                           scene={'track': track}, fixed_poses={},
+                           fixed_poses_backend='simulation', fixed_poses_device_profile='sim',
+                           arm=arm, done=True, succeeded=True)
+    reference.ReferenceBase.run(node)
+    arm.pick_and_place.assert_not_called()
+    arm.fixed_pick_and_place.assert_not_called()
+    node.wait_for_state.assert_not_called()
+    assert not node.succeeded and not node.done

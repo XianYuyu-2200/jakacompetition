@@ -151,3 +151,24 @@ ROS 2 的 `robot_state_publisher` **只有在 `/joint_states` 的
 RViz 里机器人不动 —— 这不是模型的问题。解决:发布时带上
 `node.get_clock().now().to_msg()`,或者给 robot_state_publisher 加
 `-p ignore_timestamp:=true`。本目录的脚本都已经带时间戳。
+
+## 固定姿态、相机与四组顺序的隔离回放
+
+在仓库根目录执行（会启动仿真并执行运动，只用于仿真；不要在此 ROS 域接入真机）：
+
+```bash
+/usr/bin/python3 verification/accept_workbench_fixed_poses.py \
+  --poses jaka_competition_kit/config/track1_simulation_example.yaml \
+  --output "$HOME/.local/share/jaka-workbench/acceptance/$(date +%Y%m%d-%H%M%S)" \
+  --domain 94
+```
+
+要求输出目录尚不存在，ROS 域没有已有节点；现有仿真冲突仍由启动检查拒绝，不会清理用户进程。脚本自己加载 ROS 和本仓库安装环境，显式设置 `JAKA_GRIPPER=1`，同时隔离 `IGN_PARTITION`、`GZ_PARTITION`。请保留桌面图形会话。
+
+默认 seed 为 `246135 1 2 3`（seed 不是二维码顺序），速度缩放 0.5。脚本等待机械臂、夹爪、控制器、MoveIt、裁判和相机都就绪；从二维码 PNG 解码，保持 MoveIt 碰撞检查并关闭笛卡尔回退。每轮要求程序 6/6、六次固定姿态执行、裁判收集顺序与生成顺序一致、相机在该轮有图像消息；失败后不自动重试。日志和 `report.json` 保存在输出目录，报告包括姿态与关键代码 SHA-256。
+
+仅副本 `active-test-only.yaml` 在回放期间启用；退出时禁用并清理本脚本拥有的进程。原姿态和用户配置不改动。`remaining_owned_jobs` 应为空。直接强杀脚本或断电无法保证执行清理，恢复后应先检查隔离环境与副本状态。
+
+**验收范围**：关节运动、二维码顺序、规划场景附着、裁判事件和相机数据联动。镜像工件没有完成物理摩擦夹持验证，程序分数不是实际比赛性能或真机许可。`verify_only` 只允许完整固定姿态的逐点规划，不支持的配置会拒绝，不能回退到实际运动。
+
+可加 `--check-gripper-stall`：在完整回放之后，仅停用本脚本隔离仿真中的夹爪控制器，验证闭合请求在到位等待超时后返回失败，且执行器在附着/判分之前退出；随后恢复控制器。它不发送机械臂运动，不测试或认证实体急停。

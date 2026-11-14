@@ -48,8 +48,8 @@ class Track1Reference(ReferenceBase):
 
 def main(args=None):
     rclpy.init(args=args)
-    spin(Track1Reference())
+    return spin(Track1Reference())
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

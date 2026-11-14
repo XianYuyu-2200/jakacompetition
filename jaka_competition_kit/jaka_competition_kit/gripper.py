@@ -180,6 +180,18 @@ class SimGripper(Gripper):
         self._msg_type = Float64MultiArray
         self.pub = node.create_publisher(Float64MultiArray, topic, 10)
         self.is_closed = False
+        # Position acknowledgement is not contact/force feedback. It only
+        # prevents a disconnected or stalled simulated controller from being
+        # treated as a successful open/close command.
+        from sensor_msgs.msg import JointState
+        from rclpy.qos import qos_profile_sensor_data
+        self._feedback = None
+        self._feedback_at = 0.0
+        self._feedback_seq = 0
+        self.feedback_timeout = 2.0
+        self.position_tolerance = 0.015
+        self._joint_sub = node.create_subscription(
+            JointState, "/joint_states", self._on_joints, qos_profile_sensor_data)
         if not arena or not arena.has_gripper:
             node.get_logger().warn(
                 "arena.yaml 里 tool.gripper 不是 wheeltec: 仿真夹爪不会动作")
@@ -198,26 +210,62 @@ class SimGripper(Gripper):
             deg = max(0.0, min(float(limit), float(deg)))
         return math.radians(deg)
 
+    def _on_joints(self, msg) -> None:
+        names = ("gripper_jaw_l_joint", "gripper_jaw_r_joint")
+        if any(msg.name.count(name) != 1 for name in names):
+            return
+        try:
+            values = tuple(float(msg.position[msg.name.index(name)]) for name in names)
+        except (IndexError, TypeError, ValueError):
+            return
+        if not all(math.isfinite(value) for value in values):
+            return
+        self._feedback = values
+        self._feedback_at = time.monotonic()
+        self._feedback_seq += 1
+
     def _send(self, angle: float) -> bool:
+        if not math.isfinite(angle):
+            self.node.get_logger().error("仿真夹爪目标角无效")
+            return False
         msg = self._msg_type()
-        # 两片指的轴同向(+y), 所以"往中心合"的转向相反: 左指负、右指正。
-        # 行程是对称的 [-limit, +limit](写成 [0, limit] 会让关节卡在边界上被冻住),
-        # 但物理上只有 "往里合" 这半边有意义。
+        # Both axes point +y, so inward motion has opposite signs.
         msg.data = [-float(angle), float(angle)]
+        started = time.monotonic()
+        previous_seq = self._feedback_seq
+        matched = 0
         self.pub.publish(msg)
-        if self.node is not None:
-            end = time.time() + self.close_delay
-            while time.time() < end:
-                rclpy.spin_once(self.node, timeout_sec=0.02)
-        return True
+        while time.monotonic() - started < self.feedback_timeout:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            now = time.monotonic()
+            if self._feedback_seq == previous_seq:
+                continue
+            previous_seq = self._feedback_seq
+            at_target = self._feedback is not None and all(
+                abs(actual - target) <= self.position_tolerance
+                for actual, target in zip(self._feedback, msg.data))
+            # Two distinct valid samples after the settling interval. A cached
+            # pre-command pose or a single transient match cannot acknowledge it.
+            if now - started >= self.close_delay and now - self._feedback_at < 0.2 and at_target:
+                matched += 1
+                if matched >= 2:
+                    return True
+            else:
+                matched = 0
+        self.node.get_logger().error(
+            f"仿真夹爪关节未确认到位（{self.feedback_timeout:.1f}s），停止后续附着/释放；"
+            f"目标={msg.data}，反馈={self._feedback}")
+        return False
 
     def open(self) -> bool:
-        self.is_closed = False
-        return self._send(self.open_angle)
+        ok = self._send(self.open_angle)
+        self.is_closed = False if ok else None
+        return ok
 
     def close(self, object_size: float | None = None) -> bool:
-        self.is_closed = True
-        return self._send(self._angle_for(object_size))
+        ok = self._send(self._angle_for(object_size))
+        self.is_closed = True if ok else None
+        return ok
 
     def close_ms(self) -> int:
         return int(self.close_delay * 1000)

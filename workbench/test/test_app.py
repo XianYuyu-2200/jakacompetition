@@ -98,6 +98,52 @@ class AppTests(unittest.TestCase):
         self.window.pose_phase.setCurrentIndex(3)
         self.assertIn("转场只使用路点", self.window.pose_status.text())
 
+    def test_simulation_example_requires_confirmation_and_preserves_backup(self):
+        import yaml
+        original = self.window._pose_path().read_bytes()
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.No):
+            self.window._load_simulation_example()
+        self.assertEqual(self.window._pose_path().read_bytes(), original)
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
+            self.window._load_simulation_example()
+        data = yaml.safe_load(self.window._pose_path().read_text())
+        self.assertTrue(data["enabled"])
+        self.assertFalse(data["calibration"]["verified"])
+        self.assertEqual(len(data["objects"]), 6)
+        backups = list(self.window._pose_path().parent.glob("*.bak"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), original)
+        self.assertIn("未移动", self.window.pose_status.text())
+        self.assertFalse(self.window.manager.active_names())
+
+    def test_simulation_example_cannot_replace_running_round(self):
+        original = self.window._pose_path().read_bytes()
+        self.window.run_state = "running"
+        with patch.object(QMessageBox, "question") as question:
+            self.window._load_simulation_example()
+        question.assert_not_called()
+        self.assertEqual(self.window._pose_path().read_bytes(), original)
+        self.assertIn("先停止", self.window.pose_status.text())
+
+    def test_pose_import_rechecks_after_confirmation(self):
+        original = self.window._pose_path().read_bytes()
+        def start_during_dialog(*args):
+            self.window.run_state = "running"
+            return QMessageBox.Yes
+        with patch.object(QMessageBox, "question", side_effect=start_during_dialog):
+            self.window._load_simulation_example()
+        self.assertEqual(self.window._pose_path().read_bytes(), original)
+        self.assertIn("未替换", self.window.pose_status.text())
+
+    def test_manual_pose_motion_cannot_compete_with_round(self):
+        self.window.demo = False
+        self.window.ready = True
+        self.window.run_state = "running"
+        with patch.object(self.window.manager, "launch") as launch:
+            self.window._move_to_pose()
+        launch.assert_not_called()
+        self.assertIn("不能并发", self.window.pose_status.text())
+
     def test_initial_state_disables_motion(self):
         self.assertTrue(self.window.launch_button.isEnabled())
         self.assertFalse(self.window.reference_button.isEnabled())

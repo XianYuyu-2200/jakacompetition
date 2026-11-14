@@ -1,7 +1,7 @@
-"""ROS 桥的纯逻辑测试；不导入 ROS，不启动仿真。"""
+"""ROS 桥逻辑回归；需 ROS Python 环境，但不创建节点或启动仿真。"""
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from workbench.ros_bridge import round_snapshot, close_reference_node
 
@@ -53,6 +53,24 @@ class ReferenceCleanupTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             close_reference_node(node)
         node.destroy_node.assert_called_once_with()
+
+
+
+class ReferenceOutcomeTests(unittest.TestCase):
+    def test_done_does_not_mean_success(self):
+        # No ROS graph or motion: fake nodes exercise the same bridge exit path.
+        from workbench.ros_bridge import reference
+        for done, succeeded, expected in ((True, False, 2), (True, True, 0), (False, False, 2)):
+            with self.subTest(done=done, succeeded=succeeded):
+                node = SimpleNamespace(wait_for_scene=Mock(return_value=True),
+                                       run=Mock(), done=done, succeeded=succeeded,
+                                       scene_cli=SimpleNamespace(close=Mock()), destroy_node=Mock())
+                with patch('rclpy.init'), patch('rclpy.ok', return_value=False), \
+                     patch('jaka_competition_kit.ref_track1.Track1Reference', return_value=node), \
+                     patch('workbench.ros_bridge.emit'):
+                    self.assertEqual(reference(.3), expected)
+                node.scene_cli.close.assert_called_once()
+                node.destroy_node.assert_called_once()
 
 
 if __name__ == "__main__":

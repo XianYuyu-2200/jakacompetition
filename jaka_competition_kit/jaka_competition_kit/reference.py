@@ -99,6 +99,7 @@ class ReferenceBase(rclpy.node.Node):
         self.arm = Executor(self, self.arena, self.backend, self.scene_cli, self.gripper,
                             timing_log=bool(self.get_parameter("debug_timing").value))
         self.done = False
+        self.succeeded = False
 
     # ---------- 回调 ----------
     def _on_scene(self, msg: String):
@@ -137,6 +138,8 @@ class ReferenceBase(rclpy.node.Node):
 
     # ---------- 主循环 ----------
     def run(self):
+        self.done = False
+        self.succeeded = False
         self.get_logger().info("等待裁判出题 (/competition/generate) ...")
         if not self.wait_for_scene():
             self.get_logger().error("没有收到题目: 先调 /competition/generate")
@@ -166,6 +169,11 @@ class ReferenceBase(rclpy.node.Node):
         fixed_ready = is_complete(
             self.fixed_poses, backend=self.fixed_poses_backend,
             device_profile=self.fixed_poses_device_profile)
+        if verify_only and (self.scene.get("track") != 1 or not fixed_ready):
+            self.get_logger().error(
+                "verify_only 仅支持完整固定姿态的独立目标规划；当前配置不支持，停止。"
+                "不会回退到会执行运动或夹爪动作的流程。")
+            return
         if self.scene.get("track") == 1 and not fixed_ready:
             allow_fallback = bool(self.get_parameter("allow_cartesian_fallback").value)
             if not allow_fallback:
@@ -238,14 +246,16 @@ class ReferenceBase(rclpy.node.Node):
 
         self.get_logger().info(
             f"参考实现结束: {ok}/{total}, 总耗时 {time.time() - t0:.1f}s")
+        self.succeeded = ok == total
         self.done = True
 
 
-def spin(node: rclpy.node.Node) -> None:
+def spin(node: rclpy.node.Node) -> int:
     try:
         node.run()
+        return 0 if node.done and node.succeeded else 2
     except KeyboardInterrupt:
-        pass
+        return 130
     finally:
         try:
             node.scene_cli.close()

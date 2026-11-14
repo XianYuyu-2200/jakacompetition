@@ -410,7 +410,7 @@ def reference(velocity: float, fixed_poses: str = "") -> int:
         # 只有构造完成、MoveIt 已连接、收到本轮场景后才通知 GUI 发令。
         emit({"type": "program-ready"})
         node.run()
-        return 0 if node.done else 2
+        return 0 if node.done and node.succeeded else 2
     except KeyboardInterrupt:
         return 130
     finally:

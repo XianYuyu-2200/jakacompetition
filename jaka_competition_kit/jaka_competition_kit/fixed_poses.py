@@ -268,3 +268,39 @@ def update_waypoints(path: str, *, station: Optional[int], phase: str,
     data.setdefault("calibration", {})["verified"] = False
     # Changing a route must never implicitly enable a previously disabled configuration.
     return _save_document(path, data)
+
+
+def import_simulation_poses(source: str, destination: str, *, enable: bool = False):
+    """Copy a complete simulation set with explicit opt-in and a unique backup.
+
+    This is configuration provenance checking, not a hardware safety interlock.
+    Neither importing nor enabling grants a physical-grasp validation status.
+    """
+    import shutil
+    if not isinstance(enable, bool):
+        raise ValueError("enable 必须是布尔值")
+    src, dst = Path(source), Path(destination)
+    if src.resolve() == dst.resolve():
+        raise ValueError("不能将姿态文件导入自身")
+    if not src.is_file():
+        raise ValueError("仿真姿态来源文件不存在")
+    data = load_fixed_poses(str(src))
+    if not is_complete({**data, "enabled": True}, backend="simulation",
+                       device_profile="jaka_mini_2_gemini305_gripper_sim"):
+        raise ValueError("仅可导入完整且 profile 匹配的仿真姿态；不能导入真机姿态")
+    if data.get("calibration", {}).get("requires_recalibration"):
+        raise ValueError("来源姿态要求重新标定，不能直接导入启用")
+    data["enabled"] = enable
+    data.setdefault("calibration", {})["verified"] = False
+    backup = None
+    if dst.exists():
+        fd, name = tempfile.mkstemp(prefix=f"{dst.name}.", suffix=".bak", dir=dst.parent)
+        os.close(fd)
+        backup = Path(name)
+        try:
+            shutil.copyfile(dst, backup)
+        except Exception:
+            backup.unlink(missing_ok=True)
+            raise
+    _save_document(str(dst), data)
+    return data, backup

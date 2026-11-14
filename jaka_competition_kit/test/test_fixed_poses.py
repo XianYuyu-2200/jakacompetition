@@ -150,3 +150,43 @@ def test_station_transfer_is_versioned_and_independent(tmp_path):
         load_fixed_poses(str(path))
     with pytest.raises(ValueError):
         update_waypoints(str(tmp_path / 'x.yaml'), station=None, phase='transfer', joints=[0] * 6)
+
+
+def test_simulation_example_import_is_disabled_by_default_and_backs_up(tmp_path):
+    from jaka_competition_kit.fixed_poses import import_simulation_poses
+    source = Path('jaka_competition_kit/config/track1_simulation_example.yaml')
+    original = source.read_bytes()
+    dest = tmp_path / 'poses.yaml'
+    dest.write_text('previous team configuration\n')
+    data, backup = import_simulation_poses(str(source), str(dest))
+    assert backup.read_text() == 'previous team configuration\n'
+    assert not data['enabled'] and not data['calibration']['verified']
+    disabled = dest.read_bytes()
+    enabled, second_backup = import_simulation_poses(str(source), str(dest), enable=True)
+    assert is_complete(enabled)
+    assert second_backup != backup and second_backup.read_bytes() == disabled
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize('changes', [
+    {'backend': 'hardware'}, {'device_profile': 'wrong'}, {'objects': {}},
+    {'calibration': {'requires_recalibration': True}},
+])
+def test_simulation_import_rejects_invalid_source_without_overwriting(tmp_path, changes):
+    from jaka_competition_kit.fixed_poses import import_simulation_poses
+    data = load_fixed_poses('jaka_competition_kit/config/track1_simulation_example.yaml')
+    data.update(changes)
+    src, dst = tmp_path / 'source.yaml', tmp_path / 'team.yaml'
+    src.write_text(yaml.safe_dump(data))
+    dst.write_text('preserve me')
+    with pytest.raises(ValueError):
+        import_simulation_poses(str(src), str(dst), enable=True)
+    assert dst.read_text() == 'preserve me'
+    assert not list(tmp_path.glob('*.bak'))
+
+
+def test_example_cannot_overwrite_itself():
+    from jaka_competition_kit.fixed_poses import import_simulation_poses
+    source = 'jaka_competition_kit/config/track1_simulation_example.yaml'
+    with pytest.raises(ValueError, match='自身'):
+        import_simulation_poses(source, source, enable=True)
