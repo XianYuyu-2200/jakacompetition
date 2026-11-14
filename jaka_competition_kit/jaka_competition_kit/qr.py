@@ -35,7 +35,9 @@ def payload(order: Sequence[int]) -> str:
 
 def parse(text: str) -> List[int]:
     """解析二维码文本;格式不合法直接抛 ValueError(裁判判定为无效)。"""
-    text = (text or "").strip()
+    if not isinstance(text, str):
+        raise ValueError("二维码载荷必须是文本")
+    text = text.strip()
     upper = text.upper()
     if upper.startswith(PREFIX):
         digits = text[len(PREFIX):]
@@ -63,7 +65,7 @@ def render_png(text: str, path: str, box_size: int = 10, border: int = 4) -> str
 
 
 def decode_image(image) -> str:
-    """从图像(numpy 数组或路径)解码二维码文本;识别不到返回空串。
+    """从图像(numpy 数组或路径)解码二维码文本;缺图、无结果或载荷歧义返回空串。
 
     依赖 pyzbar;OpenCV 自带的 QRCodeDetector 在很多发行版里没有链接 QUIRC,
     实际不能解码, 所以这里默认用 pyzbar。
@@ -75,5 +77,14 @@ def decode_image(image) -> str:
     if isinstance(image, str):
         import cv2
         image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-    results = _decode(image)
-    return results[0].data.decode("utf-8") if results else ""
+    if image is None or getattr(image, "size", 0) == 0:
+        return ""
+    # A frame containing different QR payloads must not choose an arbitrary
+    # first result and start a different six-station sequence.
+    from pyzbar.pyzbar import ZBarSymbol
+    try:
+        results = _decode(image, symbols=[ZBarSymbol.QRCODE])
+        texts = {result.data.decode("utf-8") for result in results}
+    except (UnicodeError, TypeError, ValueError):
+        return ""
+    return next(iter(texts)) if len(texts) == 1 else ""

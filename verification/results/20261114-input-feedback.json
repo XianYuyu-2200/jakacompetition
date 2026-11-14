@@ -1,0 +1,633 @@
+{
+  "code_sha256": {
+    "jaka_competition_kit/jaka_competition_kit/reference.py": "678859351f6f1f7a7e3b370380472092d69c08c90e747d025ac32dddcb287dc8",
+    "jaka_competition_kit/jaka_competition_kit/ref_track1.py": "7133cee7c7addcbbbabe2022740947527048b8269d6c5a0e642dbdca5829c0e5",
+    "jaka_competition_kit/jaka_competition_kit/qr.py": "95631dd916596e191e337443fe10728211cdede30f978f81bd185a4983b95f81",
+    "jaka_competition_kit/jaka_competition_kit/scorer.py": "f76d32e9f84b86e16030ecd45c069c4b4bed03f28fb74442d449e5f41ad2151e",
+    "jaka_competition_kit/config/arena.yaml": "491b9e7206b7a9d69eb2aaa8d221b7f21d107354291ea5eeecc4536b56ddff9e",
+    "jaka_competition_kit/config/rules.yaml": "b6ced38750b93dbc9b39c2ab324a076a02fa3bd032d223b69719790c09c9f883",
+    "jaka_competition_kit/jaka_competition_kit/gripper.py": "4a8f4a086c0b55c6facbf633bd520e48bc8d3934f9749cb381c2c2cd291b4667",
+    "jaka_competition_kit/jaka_competition_kit/executor.py": "5af5ae8845d2a309f985694e70669de2a6e48277ea3c22bcf8d560bae7db3c60",
+    "verification/accept_workbench_fixed_poses.py": "de7a6750952b48a39eecc2b67e1702e5a71ea0682b84f3904865f4fc2f8b981c",
+    "verification/sim_controller_switch.py": "2300ff0496a7387b1f5bf40826e714df485340301a2bb261e51ab897f476f17b"
+  },
+  "source_sha256": "b001d1e69922bc580383c6247dfa556c0e94624f8119c20653a61839e878a5a5",
+  "source": "/home/ktz/codex/codex-competition/jaka_competition_kit/config/track1_simulation_example.yaml",
+  "domain": 94,
+  "partition": "jaka_acceptance_94_417448",
+  "velocity": 0.5,
+  "physical_contact_validated": false,
+  "rounds": [
+    {
+      "seed": 246135,
+      "passed": true,
+      "summary": [
+        "[INFO] [1794624302.506176449] [ref_track1]: 二维码内容 'JAKA1-165324' -> 抓取顺序 [1, 6, 5, 3, 2, 4]",
+        "[INFO] [1794624363.072011246] [ref_track1]: 参考实现结束: 6/6, 总耗时 60.6s"
+      ],
+      "camera_frames_during_round": 203,
+      "score": {
+        "track": 1,
+        "track_name": "基础组 · 二维码序令定点抓取赛",
+        "team": "learning",
+        "round": "practice",
+        "seed": 246135,
+        "finish_reason": "全部工件入盒",
+        "started": true,
+        "elapsed_s": 59.71,
+        "time_limit_s": 145.0,
+        "generated_order": [
+          1,
+          6,
+          5,
+          3,
+          2,
+          4
+        ],
+        "collected": [
+          {
+            "id": "wp_1",
+            "t": 9.51293158531189,
+            "label": "长方体",
+            "bin_id": "",
+            "station": 1,
+            "order_ok": true
+          },
+          {
+            "id": "wp_6",
+            "t": 19.817922115325928,
+            "label": "六棱柱",
+            "bin_id": "",
+            "station": 6,
+            "order_ok": true
+          },
+          {
+            "id": "wp_5",
+            "t": 28.93743348121643,
+            "label": "三棱柱",
+            "bin_id": "",
+            "station": 5,
+            "order_ok": true
+          },
+          {
+            "id": "wp_3",
+            "t": 37.71606183052063,
+            "label": "圆柱体",
+            "bin_id": "",
+            "station": 3,
+            "order_ok": true
+          },
+          {
+            "id": "wp_2",
+            "t": 47.29774308204651,
+            "label": "正方体",
+            "bin_id": "",
+            "station": 2,
+            "order_ok": true
+          },
+          {
+            "id": "wp_4",
+            "t": 59.71238732337952,
+            "label": "球体",
+            "bin_id": "",
+            "station": 4,
+            "order_ok": true
+          }
+        ],
+        "collected_count": 6,
+        "out_of_order": [],
+        "misplaced": [],
+        "dropped": [],
+        "collisions": 0,
+        "interventions": 0,
+        "scores": {
+          "base": 60.0,
+          "efficiency": 40.0,
+          "collision_penalty": 0.0,
+          "drop_penalty": 0.0,
+          "intervention_penalty": 0.0,
+          "innovation_bonus": 0.0
+        },
+        "invalid": false,
+        "total": 100.0,
+        "log": [
+          "[   4.6s] 抓取 wp_1 (距真值 0mm)",
+          "[   9.5s] ✔ 工位1 入盒 (顺序正确)",
+          "[  13.8s] 抓取 wp_6 (距真值 0mm)",
+          "[  19.8s] ✔ 工位6 入盒 (顺序正确)",
+          "[  24.6s] 抓取 wp_5 (距真值 0mm)",
+          "[  28.9s] ✔ 工位5 入盒 (顺序正确)",
+          "[  33.5s] 抓取 wp_3 (距真值 0mm)",
+          "[  37.7s] ✔ 工位3 入盒 (顺序正确)",
+          "[  42.7s] 抓取 wp_2 (距真值 0mm)",
+          "[  47.3s] ✔ 工位2 入盒 (顺序正确)",
+          "[  52.6s] 抓取 wp_4 (距真值 0mm)",
+          "[  59.7s] ✔ 工位4 入盒 (顺序正确)"
+        ]
+      }
+    },
+    {
+      "seed": 1,
+      "passed": true,
+      "summary": [
+        "[INFO] [1794624374.526337309] [ref_track1]: 二维码内容 'JAKA1-346152' -> 抓取顺序 [3, 4, 6, 1, 5, 2]",
+        "[INFO] [1794624434.426129416] [ref_track1]: 参考实现结束: 6/6, 总耗时 59.9s"
+      ],
+      "camera_frames_during_round": 195,
+      "score": {
+        "track": 1,
+        "track_name": "基础组 · 二维码序令定点抓取赛",
+        "team": "learning",
+        "round": "practice",
+        "seed": 1,
+        "finish_reason": "全部工件入盒",
+        "started": true,
+        "elapsed_s": 59.07,
+        "time_limit_s": 145.0,
+        "generated_order": [
+          3,
+          4,
+          6,
+          1,
+          5,
+          2
+        ],
+        "collected": [
+          {
+            "id": "wp_3",
+            "t": 7.955408811569214,
+            "label": "圆柱体",
+            "bin_id": "",
+            "station": 3,
+            "order_ok": true
+          },
+          {
+            "id": "wp_4",
+            "t": 20.37879967689514,
+            "label": "球体",
+            "bin_id": "",
+            "station": 4,
+            "order_ok": true
+          },
+          {
+            "id": "wp_6",
+            "t": 30.69193935394287,
+            "label": "六棱柱",
+            "bin_id": "",
+            "station": 6,
+            "order_ok": true
+          },
+          {
+            "id": "wp_1",
+            "t": 40.40925574302673,
+            "label": "长方体",
+            "bin_id": "",
+            "station": 1,
+            "order_ok": true
+          },
+          {
+            "id": "wp_5",
+            "t": 49.4880576133728,
+            "label": "三棱柱",
+            "bin_id": "",
+            "station": 5,
+            "order_ok": true
+          },
+          {
+            "id": "wp_2",
+            "t": 59.07108998298645,
+            "label": "正方体",
+            "bin_id": "",
+            "station": 2,
+            "order_ok": true
+          }
+        ],
+        "collected_count": 6,
+        "out_of_order": [],
+        "misplaced": [],
+        "dropped": [],
+        "collisions": 0,
+        "interventions": 0,
+        "scores": {
+          "base": 60.0,
+          "efficiency": 40.0,
+          "collision_penalty": 0.0,
+          "drop_penalty": 0.0,
+          "intervention_penalty": 0.0,
+          "innovation_bonus": 0.0
+        },
+        "invalid": false,
+        "total": 100.0,
+        "log": [
+          "[   3.8s] 抓取 wp_3 (距真值 0mm)",
+          "[   8.0s] ✔ 工位3 入盒 (顺序正确)",
+          "[  13.3s] 抓取 wp_4 (距真值 0mm)",
+          "[  20.4s] ✔ 工位4 入盒 (顺序正确)",
+          "[  24.7s] 抓取 wp_6 (距真值 0mm)",
+          "[  30.7s] ✔ 工位6 入盒 (顺序正确)",
+          "[  35.5s] 抓取 wp_1 (距真值 0mm)",
+          "[  40.4s] ✔ 工位1 入盒 (顺序正确)",
+          "[  45.2s] 抓取 wp_5 (距真值 0mm)",
+          "[  49.5s] ✔ 工位5 入盒 (顺序正确)",
+          "[  54.5s] 抓取 wp_2 (距真值 0mm)",
+          "[  59.1s] ✔ 工位2 入盒 (顺序正确)"
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "passed": true,
+      "summary": [
+        "[INFO] [1794624444.840186506] [ref_track1]: 二维码内容 'JAKA1-342561' -> 抓取顺序 [3, 4, 2, 5, 6, 1]",
+        "[INFO] [1794624504.771669373] [ref_track1]: 参考实现结束: 6/6, 总耗时 59.9s"
+      ],
+      "camera_frames_during_round": 190,
+      "score": {
+        "track": 1,
+        "track_name": "基础组 · 二维码序令定点抓取赛",
+        "team": "learning",
+        "round": "practice",
+        "seed": 2,
+        "finish_reason": "全部工件入盒",
+        "started": true,
+        "elapsed_s": 59.12,
+        "time_limit_s": 145.0,
+        "generated_order": [
+          3,
+          4,
+          2,
+          5,
+          6,
+          1
+        ],
+        "collected": [
+          {
+            "id": "wp_3",
+            "t": 7.976226329803467,
+            "label": "圆柱体",
+            "bin_id": "",
+            "station": 3,
+            "order_ok": true
+          },
+          {
+            "id": "wp_4",
+            "t": 20.303067922592163,
+            "label": "球体",
+            "bin_id": "",
+            "station": 4,
+            "order_ok": true
+          },
+          {
+            "id": "wp_2",
+            "t": 29.9027578830719,
+            "label": "正方体",
+            "bin_id": "",
+            "station": 2,
+            "order_ok": true
+          },
+          {
+            "id": "wp_5",
+            "t": 39.053014516830444,
+            "label": "三棱柱",
+            "bin_id": "",
+            "station": 5,
+            "order_ok": true
+          },
+          {
+            "id": "wp_6",
+            "t": 49.3927321434021,
+            "label": "六棱柱",
+            "bin_id": "",
+            "station": 6,
+            "order_ok": true
+          },
+          {
+            "id": "wp_1",
+            "t": 59.12213110923767,
+            "label": "长方体",
+            "bin_id": "",
+            "station": 1,
+            "order_ok": true
+          }
+        ],
+        "collected_count": 6,
+        "out_of_order": [],
+        "misplaced": [],
+        "dropped": [],
+        "collisions": 0,
+        "interventions": 0,
+        "scores": {
+          "base": 60.0,
+          "efficiency": 40.0,
+          "collision_penalty": 0.0,
+          "drop_penalty": 0.0,
+          "intervention_penalty": 0.0,
+          "innovation_bonus": 0.0
+        },
+        "invalid": false,
+        "total": 100.0,
+        "log": [
+          "[   3.8s] 抓取 wp_3 (距真值 0mm)",
+          "[   8.0s] ✔ 工位3 入盒 (顺序正确)",
+          "[  13.3s] 抓取 wp_4 (距真值 0mm)",
+          "[  20.3s] ✔ 工位4 入盒 (顺序正确)",
+          "[  25.3s] 抓取 wp_2 (距真值 0mm)",
+          "[  29.9s] ✔ 工位2 入盒 (顺序正确)",
+          "[  34.7s] 抓取 wp_5 (距真值 0mm)",
+          "[  39.1s] ✔ 工位5 入盒 (顺序正确)",
+          "[  43.3s] 抓取 wp_6 (距真值 0mm)",
+          "[  49.4s] ✔ 工位6 入盒 (顺序正确)",
+          "[  54.2s] 抓取 wp_1 (距真值 0mm)",
+          "[  59.1s] ✔ 工位1 入盒 (顺序正确)"
+        ]
+      }
+    },
+    {
+      "seed": 3,
+      "passed": true,
+      "summary": [
+        "[INFO] [1794624515.423975165] [ref_track1]: 二维码内容 'JAKA1-134652' -> 抓取顺序 [1, 3, 4, 6, 5, 2]",
+        "[INFO] [1794624575.585478248] [ref_track1]: 参考实现结束: 6/6, 总耗时 60.2s"
+      ],
+      "camera_frames_during_round": 194,
+      "score": {
+        "track": 1,
+        "track_name": "基础组 · 二维码序令定点抓取赛",
+        "team": "learning",
+        "round": "practice",
+        "seed": 3,
+        "finish_reason": "全部工件入盒",
+        "started": true,
+        "elapsed_s": 59.33,
+        "time_limit_s": 145.0,
+        "generated_order": [
+          1,
+          3,
+          4,
+          6,
+          5,
+          2
+        ],
+        "collected": [
+          {
+            "id": "wp_1",
+            "t": 8.910075187683105,
+            "label": "长方体",
+            "bin_id": "",
+            "station": 1,
+            "order_ok": true
+          },
+          {
+            "id": "wp_3",
+            "t": 17.737105131149292,
+            "label": "圆柱体",
+            "bin_id": "",
+            "station": 3,
+            "order_ok": true
+          },
+          {
+            "id": "wp_4",
+            "t": 30.193140268325806,
+            "label": "球体",
+            "bin_id": "",
+            "station": 4,
+            "order_ok": true
+          },
+          {
+            "id": "wp_6",
+            "t": 40.54913330078125,
+            "label": "六棱柱",
+            "bin_id": "",
+            "station": 6,
+            "order_ok": true
+          },
+          {
+            "id": "wp_5",
+            "t": 49.709643840789795,
+            "label": "三棱柱",
+            "bin_id": "",
+            "station": 5,
+            "order_ok": true
+          },
+          {
+            "id": "wp_2",
+            "t": 59.32514405250549,
+            "label": "正方体",
+            "bin_id": "",
+            "station": 2,
+            "order_ok": true
+          }
+        ],
+        "collected_count": 6,
+        "out_of_order": [],
+        "misplaced": [],
+        "dropped": [],
+        "collisions": 0,
+        "interventions": 0,
+        "scores": {
+          "base": 60.0,
+          "efficiency": 40.0,
+          "collision_penalty": 0.0,
+          "drop_penalty": 0.0,
+          "intervention_penalty": 0.0,
+          "innovation_bonus": 0.0
+        },
+        "invalid": false,
+        "total": 100.0,
+        "log": [
+          "[   3.9s] 抓取 wp_1 (距真值 0mm)",
+          "[   8.9s] ✔ 工位1 入盒 (顺序正确)",
+          "[  13.5s] 抓取 wp_3 (距真值 0mm)",
+          "[  17.7s] ✔ 工位3 入盒 (顺序正确)",
+          "[  23.1s] 抓取 wp_4 (距真值 0mm)",
+          "[  30.2s] ✔ 工位4 入盒 (顺序正确)",
+          "[  34.5s] 抓取 wp_6 (距真值 0mm)",
+          "[  40.5s] ✔ 工位6 入盒 (顺序正确)",
+          "[  45.3s] 抓取 wp_5 (距真值 0mm)",
+          "[  49.7s] ✔ 工位5 入盒 (顺序正确)",
+          "[  54.7s] 抓取 wp_2 (距真值 0mm)",
+          "[  59.3s] ✔ 工位2 入盒 (顺序正确)"
+        ]
+      }
+    }
+  ],
+  "gripper_switch_inactive": {
+    "before": "active",
+    "after": "inactive",
+    "response_received": true
+  },
+  "gripper_stall_rejected": true,
+  "gripper_switch_active": {
+    "before": "inactive",
+    "after": "active",
+    "response_received": true
+  },
+  "passed": true,
+  "image_messages": 901,
+  "last_status": {
+    "type": "status",
+    "ready": false,
+    "checks": [
+      {
+        "name": "机械臂关节",
+        "level": "ok",
+        "detail": "已就绪"
+      },
+      {
+        "name": "夹爪关节",
+        "level": "ok",
+        "detail": "已就绪"
+      },
+      {
+        "name": "三组控制器",
+        "level": "warning",
+        "detail": "等待有效反馈"
+      },
+      {
+        "name": "MoveIt 执行接口",
+        "level": "ok",
+        "detail": "已就绪"
+      },
+      {
+        "name": "规划场景服务",
+        "level": "ok",
+        "detail": "已就绪"
+      },
+      {
+        "name": "出题与发令服务",
+        "level": "ok",
+        "detail": "已就绪"
+      },
+      {
+        "name": "彩色与深度图像",
+        "level": "ok",
+        "detail": "已就绪"
+      }
+    ],
+    "joint_age_s": 0.0007681389979552478,
+    "joint_positions": {
+      "joint_1": -2.6390000000000016,
+      "joint_2": 0.9202000000017388,
+      "joint_3": 0.2725000000033876,
+      "joint_4": -5.22303296567344e-14,
+      "joint_5": 1.9488000000000103,
+      "joint_6": 0.5025999999999995
+    },
+    "recognition": null,
+    "run_state": "finished",
+    "scene": {
+      "seed": 3,
+      "qr_png": "/home/ktz/.local/share/jaka-workbench/acceptance/20261114-input-feedback-regression-03/qr_track1_3.png",
+      "qr_payload": "JAKA1-134652",
+      "qr_order": [
+        1,
+        3,
+        4,
+        6,
+        5,
+        2
+      ],
+      "object_count": 6
+    },
+    "score": {
+      "track": 1,
+      "track_name": "基础组 · 二维码序令定点抓取赛",
+      "team": "learning",
+      "round": "practice",
+      "seed": 3,
+      "finish_reason": "全部工件入盒",
+      "started": true,
+      "elapsed_s": 59.33,
+      "time_limit_s": 145.0,
+      "generated_order": [
+        1,
+        3,
+        4,
+        6,
+        5,
+        2
+      ],
+      "collected": [
+        {
+          "id": "wp_1",
+          "t": 8.910075187683105,
+          "label": "长方体",
+          "bin_id": "",
+          "station": 1,
+          "order_ok": true
+        },
+        {
+          "id": "wp_3",
+          "t": 17.737105131149292,
+          "label": "圆柱体",
+          "bin_id": "",
+          "station": 3,
+          "order_ok": true
+        },
+        {
+          "id": "wp_4",
+          "t": 30.193140268325806,
+          "label": "球体",
+          "bin_id": "",
+          "station": 4,
+          "order_ok": true
+        },
+        {
+          "id": "wp_6",
+          "t": 40.54913330078125,
+          "label": "六棱柱",
+          "bin_id": "",
+          "station": 6,
+          "order_ok": true
+        },
+        {
+          "id": "wp_5",
+          "t": 49.709643840789795,
+          "label": "三棱柱",
+          "bin_id": "",
+          "station": 5,
+          "order_ok": true
+        },
+        {
+          "id": "wp_2",
+          "t": 59.32514405250549,
+          "label": "正方体",
+          "bin_id": "",
+          "station": 2,
+          "order_ok": true
+        }
+      ],
+      "collected_count": 6,
+      "out_of_order": [],
+      "misplaced": [],
+      "dropped": [],
+      "collisions": 0,
+      "interventions": 0,
+      "scores": {
+        "base": 60.0,
+        "efficiency": 40.0,
+        "collision_penalty": 0.0,
+        "drop_penalty": 0.0,
+        "intervention_penalty": 0.0,
+        "innovation_bonus": 0.0
+      },
+      "invalid": false,
+      "total": 100.0,
+      "log": [
+        "[   3.9s] 抓取 wp_1 (距真值 0mm)",
+        "[   8.9s] ✔ 工位1 入盒 (顺序正确)",
+        "[  13.5s] 抓取 wp_3 (距真值 0mm)",
+        "[  17.7s] ✔ 工位3 入盒 (顺序正确)",
+        "[  23.1s] 抓取 wp_4 (距真值 0mm)",
+        "[  30.2s] ✔ 工位4 入盒 (顺序正确)",
+        "[  34.5s] 抓取 wp_6 (距真值 0mm)",
+        "[  40.5s] ✔ 工位6 入盒 (顺序正确)",
+        "[  45.3s] 抓取 wp_5 (距真值 0mm)",
+        "[  49.7s] ✔ 工位5 入盒 (顺序正确)",
+        "[  54.7s] 抓取 wp_2 (距真值 0mm)",
+        "[  59.3s] ✔ 工位2 入盒 (顺序正确)"
+      ]
+    }
+  },
+  "remaining_owned_jobs": []
+}

@@ -80,9 +80,15 @@ def main(argv=None):
                PYTHONPATH=f'{ROOT}:{ROOT}/jaka_competition_kit:' + os.environ.get('PYTHONPATH', ''))
     code_files = [
         'jaka_competition_kit/jaka_competition_kit/reference.py',
+        'jaka_competition_kit/jaka_competition_kit/ref_track1.py',
+        'jaka_competition_kit/jaka_competition_kit/qr.py',
+        'jaka_competition_kit/jaka_competition_kit/scorer.py',
+        'jaka_competition_kit/config/arena.yaml',
+        'jaka_competition_kit/config/rules.yaml',
         'jaka_competition_kit/jaka_competition_kit/gripper.py',
         'jaka_competition_kit/jaka_competition_kit/executor.py',
         'verification/accept_workbench_fixed_poses.py',
+        'verification/sim_controller_switch.py',
     ]
     report = {'code_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                               for name in code_files}, 'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
@@ -155,7 +161,8 @@ def main(argv=None):
                            '--mode', 'basic', '--camera'])
         until(lambda: state['status'] and state['status']['ready'], 100)
         for seed in args.seeds:
-            text = run(f'param-{seed}', ['ros2', 'param', 'set', '/competition_scene_generator', 'seed', str(seed)])
+            text = run(f'param-{seed}', ['ros2', 'param', 'set', '--no-daemon', '--spin-time', '2',
+                                         '/competition_scene_generator', 'seed', str(seed)])
             if 'Set parameter successful' not in text:
                 raise RuntimeError('seed change was not acknowledged: ' + text)
             service(f'generate-{seed}', 'generate')
@@ -189,14 +196,19 @@ def main(argv=None):
         if args.check_gripper_stall:
             # No arm motion. Deactivate the controller owned by this isolated
             # stack, request a different finger position, then restore it.
-            run('gripper-deactivate', ['ros2', 'control', 'switch_controllers',
-                                      '--deactivate', 'gripper_controller', '--strict'])
+            def switch(target):
+                text = run('gripper-' + target, ['/usr/bin/python3', '-c',
+                    'from verification.sim_controller_switch import main; '
+                    f'main({target!r})'], timeout=40)
+                report['gripper_switch_' + target] = json.loads(text.strip().splitlines()[-1])
             try:
+                switch('inactive')
                 run('gripper-stall', ['/usr/bin/python3', '-c', STALL_PROBE])
                 report['gripper_stall_rejected'] = True
             finally:
-                run('gripper-reactivate', ['ros2', 'control', 'switch_controllers',
-                                          '--activate', 'gripper_controller', '--strict'])
+                # A lost reply does not mean the request had no effect. Always
+                # restore using state readback, including deactivate failures.
+                switch('active')
         report['passed'] = True
     except (Exception, KeyboardInterrupt) as exc:
         report['error'] = repr(exc)

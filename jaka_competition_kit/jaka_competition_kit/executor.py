@@ -378,9 +378,17 @@ class Executor:
                     f"工位{station} 固定姿态阶段 {phase} 失败: {result}")
                 return False
             try:
-                self.tcp_xyz = tuple(float(v) for v in self.tcp_pose()[0])
-            except Exception:  # TF may lag a single cycle; grasp() checks it again.
-                pass
+                xyz = tuple(float(v) for v in self.tcp_pose()[0])
+                if len(xyz) != 3 or not all(math.isfinite(v) for v in xyz):
+                    raise ValueError("TCP 坐标必须是三个有限数值")
+                self.tcp_xyz = xyz
+            except Exception as exc:
+                # Do not reuse the previous phase's TCP for attachment/release
+                # or scoring. tcp_pose already waits for TF before failing.
+                self.last_failure = "feedback"
+                self.node.get_logger().error(
+                    f"工位{station} 固定姿态阶段 {phase} 无有效 TCP 反馈，停止: {exc}")
+                return False
             return True
         if not move(phases[0], "approach"):
             return False

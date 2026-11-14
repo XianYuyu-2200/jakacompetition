@@ -97,6 +97,9 @@ class Scorer(rclpy.node.Node):
         except json.JSONDecodeError:
             self.get_logger().warn(f"事件不是合法 JSON: {msg.data!r}")
             return
+        if not isinstance(ev, dict):
+            self.get_logger().warn("事件必须是 JSON 对象，忽略")
+            return
         kind = ev.get("event", "")
         if kind == "grasp":
             self._handle_grasp(ev)
@@ -131,13 +134,35 @@ class Scorer(rclpy.node.Node):
                 return o
         return None
 
+    def _event_pose(self, ev: Dict):
+        """Reject malformed/nonfinite telemetry before changing round state.
+
+        Missing coordinates must not be replaced by the world origin. In
+        particular, NaN must not bypass the grasp-distance comparison.
+        """
+        pose = ev.get("pose")
+        if (not isinstance(pose, list) or len(pose) != 3
+                or any(type(v) not in (int, float) for v in pose)):
+            self._log("事件 pose 必须是三个有限数值，忽略")
+            return None
+        try:
+            valid = all(math.isfinite(v) for v in pose)
+        except OverflowError:
+            valid = False
+        if not valid:
+            self._log("事件 pose 含非有限数值，忽略")
+            return None
+        return pose
+
     def _handle_grasp(self, ev: Dict):
         if self.state != "running":
             self._log(f"非比赛时段忽略抓取: {ev.get('object_id')}")
             return
         obj_id = ev.get("object_id", "")
         truth = self._object_truth(obj_id)
-        pose = ev.get("pose") or [0, 0, 0]
+        pose = self._event_pose(ev)
+        if pose is None:
+            return
         if truth is None:
             self._log(f"抓取事件引用了不存在的工件 {obj_id!r}, 不计分")
             return
@@ -171,7 +196,9 @@ class Scorer(rclpy.node.Node):
         if self.state != "running":
             return
         obj_id = ev.get("object_id", "")
-        pose = ev.get("pose") or [0, 0, 0]
+        pose = self._event_pose(ev)
+        if pose is None:
+            return
         if self.holding != obj_id:
             self._log(f"释放 {obj_id} 但当前并未持有它, 忽略")
             return

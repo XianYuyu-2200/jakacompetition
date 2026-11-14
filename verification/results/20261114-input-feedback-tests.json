@@ -1,0 +1,32 @@
+{
+  "name": "pytest",
+  "errors": "0",
+  "failures": "0",
+  "skipped": "0",
+  "tests": "1057",
+  "time": "29.544",
+  "timestamp": "2026-11-14T10:44:54.436640",
+  "hostname": "ktz",
+  "scope": "software regression; motion doubles, not physical acceptance",
+  "qr_permutations": 720,
+  "qr_images": 1440,
+  "action_faults": 57,
+  "tf_phase_faults": 36,
+  "xml_sha256": "9d5c714c467d9bf97b47d52f09d64fbc00b06bad9fdee389372a1e04ad490a25",
+  "code_sha256": {
+    "workbench/test/test_acceptance_runner.py": "cd2f4deadd2e812d75c72c1d03d3f1a04c3d913aee3457789bcd6d9024d90370",
+    "workbench/test/test_app.py": "09e40ee6ae88d9badf3959ca2b30277c5ba5a36d87cd00b7a04646aa6bf5cc96",
+    "workbench/test/test_bridge.py": "e85a6e7e106853f4e2e15bd3b020f716fb72340286112007d5c625d45345c6c9",
+    "workbench/test/test_distribution.py": "ba4b8195b310c6db6710f4e51ece0b73d8b91590ddb40a735a88afa1058fe99e",
+    "workbench/test/test_runtime.py": "123e42393d18bb7b317946283228c889a3d36f9f0d7958a1845f5fc8ba9fb287",
+    "workbench/test/test_service_ui.py": "b1c2ea53e88e2a0638c681dd756361598a18f267f81ac0d812cb8cf1840e270e",
+    "jaka_competition_kit/test/test_fixed_poses.py": "24d9d0fc41c263be393338936ecbf18b7db047a4b446e18ecb5f0b132807a85d",
+    "jaka_competition_kit/test/test_qr_failure_inputs.py": "b77334a8dada1eef5d6d5e495c2c6ce40e135e197b7663bb7f33b18f706b916a",
+    "jaka_competition_kit/test/test_reference_object_schema.py": "7952f6bcc8d7706343d9a2ba93e8bba3402123e11f16ce50f5e896d667062804",
+    "jaka_competition_kit/test/test_reference_waits.py": "25148f138b71081c0cde368ad8916c680612a544fe0742ce86c589eb746e82ad",
+    "jaka_competition_kit/test/test_scorer_events.py": "7307b2bde5ec909083cf02973934abf67b828b795c59be4bd6ea781915f52067",
+    "jaka_competition_kit/test/test_sim_gripper_feedback.py": "1f629d895ccda56165436eceac05bfbec6f125063117b66ea4de29c41e6c84c9",
+    "jaka_competition_kit/test/test_track1_acceptance.py": "bb0080ab42a05495925987c879b600d17640d68c877c38797de6c58581cf54bb",
+    "jaka_competition_kit/test/test_track1_all_orders.py": "d4cd90da4c05782734eb1a5caf3d4229c6462af2361f5c087dfc015a2549d865"
+  }
+}
